@@ -104,9 +104,11 @@ def pick_loader(epoch, stage, loaders):
 	
 	return loader, load_tracker
 	
-def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP, replacement_threshold, cluster_names, cirriculum):
+def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP, replacement_threshold, cluster_names, cirriculum, weight_decay):
 	# define optimization strategy
-	optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+	# L2 regularization in pytorch: https://discuss.pytorch.org/t/simple-l2-regularization/139
+	# Adam weight decay: https://www.fast.ai/2018/07/02/adam-weight-decay/
+	optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay) # weight_decay term = L2 regularization
 	criterion = nn.BCELoss(reduction='sum')
 	# Use gpu if available
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,7 +156,6 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 			optimizer.step()
 			
 			train_f1 = f1_score(pred, target, replacement_threshold)
-			tune.report(mean_accuracy=acc)
 			
 			if idx % print_every == 1:
 				
@@ -180,7 +181,7 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 				with torch.no_grad():
 					# Only keep one loss + F1 score
 					# Need to have equal number of train and test cases for learning curve
-					keeper_idx = random.randint(0,len(loaders['test']))
+					keeper_idx = random.randint(0,len(loaders['test'])-1)
 					for test_idx, (test_data,target) in enumerate(loaders['test']):  
 						if test_idx != keeper_idx: continue
 						pred = model(test_data)
@@ -188,7 +189,7 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 						test_losses.append(loss.item()) 
 						test_f1 = f1_score(pred, target, replacement_threshold)
 						test_f1_scores.append(test_f1)
-											
+						break
 	
 	#torch.save(model.state_dict(), SAVE_FP+"autoencoder_weights.txt")
 	torch.save(model, SAVE_FP+"autoencoder_weights.txt")

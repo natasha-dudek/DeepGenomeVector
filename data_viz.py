@@ -41,13 +41,14 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
 		else:
 			x_losses = x_losses[:len(train_y)]
 			test_y = train_y[:len(train_y)]
-	
-	fig=plt.figure()
+	fig, ax = plt.subplots(figsize=(20, 7))
+	#fig=plt.figure()
 	ax=fig.add_subplot(111)
 
 	ax.plot(x_losses,train_y,marker='o', c='b',label='Training',fillstyle='none')
 	ax.plot(x_losses,test_y,marker='o',c='g',label='CV',fillstyle='none')
 	plt.legend(loc=1)
+	
 	if type_curve == "optimization":
 		plt.title("Optimization Learning Curve")
 		plt.ylabel("BCE loss")
@@ -62,8 +63,8 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
 	
 	if cirriculum:
 		switch =  int(len(x_losses) / 3)
-#		plt.axvline(x=switch - 1) 
 #		plt.axvline(x=switch) 
+#		plt.axvline(x=2*switch) 
 #		plt.axvline(x=2*switch -1) 
 #		plt.axvline(x=2*switch) 
 		

@@ -15,7 +15,7 @@ def hamming(target, b_pred):
 		hs.append(hamming_loss(target[i], b_pred[i]))
 	return hs
 	
-def dom_confusion_matrix(b_pred, target, num_to_genome, genome_to_tax, test_tax_dict):
+def dom_confusion_matrix(b_pred, target, num_to_genome, genome_to_tax, test_tax_dict, genome_idx_test):
 	
 	"""
 	pred = (baseline: corrupt_test_data) or (model: b_pred)
@@ -33,7 +33,7 @@ def dom_confusion_matrix(b_pred, target, num_to_genome, genome_to_tax, test_tax_
 	
 	    # Get taxonomic lineage for each genome
 	
-	    tax = genome_to_tax[test_tax_dict[i]]
+	    tax = genome_to_tax[test_tax_dict[genome_idx_test[i]]]
 	    
 	    phylum_mode = False
 	    if phylum_mode:
@@ -85,10 +85,13 @@ def generate_baseline(num_features, train_data, corrupt_test_data, mode, cluster
 
 	train_data2 = torch.tensor([i.numpy() for i in train_data]).float()
 	corrupt_train = train_data2[:,:len(cluster_names)]
-
+	
+	tempy = deepcopy(corrupt_test_data)
+	
 	for i in range(len(corrupt_test_data)):
 
-		genome = deepcopy(corrupt_test_data[0])
+		#genome = deepcopy(corrupt_test_data[0])
+		genome = tempy[i]
 
 		if mode == "base_random":
 			gene_count = sum(genome.numpy() == 1) 
@@ -107,8 +110,12 @@ def generate_baseline(num_features, train_data, corrupt_test_data, mode, cluster
 
 	return b_pred
 
-
-
+def majority_baseline(corrupt_test_data):
+	
+	b_pred = np.zeros(corrupt_test_data.shape)
+	
+	for i in range(len(corrupt_test_data)):
+		genome = deepcopy(corrupt_test_data[0])
 
 
 

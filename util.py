@@ -4,7 +4,7 @@ from torch.utils.data import random_split
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 import random
-from genome_autoencoder import data_viz
+from genome_embeddings import data_viz
 import os
 from collections import defaultdict
 import random
@@ -204,7 +204,7 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
     
     For taxonomic groups with >=10 genomes, split those 10 by n_test
     For groups with <10 and > 1 genomes, split them 50-50 into train/test
-    For groups with only 1 genome, put it in the test set
+    For groups with only 1 genome, put it in the train set
     Note: the fraction of train vs test data will not be exactly equal to n_test 
     
     Arguments:
@@ -272,8 +272,8 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
             elif num_genomes == 1:
                 #p_test = round(bacteria[domain][phylum]*1)
                 #p_train = bacteria[domain][phylum] - p_test
-                p_test = 1
-                p_train = 0
+                p_test = 0
+                p_train = 1
                 
             else:
                 # phylum: [T1230, T327891, T32780]
@@ -317,10 +317,13 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
     
     return train_df, test_df
 
-def bacteria_only(data, genome_idx_train, train_genomes, genome_to_tax):
+def bacteria_only(data, train_genomes, genome_to_tax):
     """
+    data - df
     genome_idx_dict - genome_idx_train or genome_idx_test
-   
+   	
+   	
+   	out - numpy array
     """
     
     tax_dict = {}
@@ -329,14 +332,15 @@ def bacteria_only(data, genome_idx_train, train_genomes, genome_to_tax):
     
     bact_counter = 0
     for s in range(len(data)):
-        orig_idx = genome_idx_train[s] # corrupt 9 to uncorrupt 0
-        t_num = train_genomes[orig_idx]
+        #orig_idx = genome_idx_train[s] # corrupt 9 to uncorrupt 0
+        
+        t_num = train_genomes[s]
         tax = genome_to_tax[t_num] # list  of dataframe index of row orig_idx
         
         domain = tax.split(";")[0]
         if domain != "k__Bacteria": continue
         
-        out[bact_counter] = data[s]
+        out[bact_counter] = data.iloc[s]
         
         tax_dict[bact_counter] = t_num
         
@@ -345,9 +349,9 @@ def bacteria_only(data, genome_idx_train, train_genomes, genome_to_tax):
     # delete out rows that weren't filled
     out = out[:bact_counter,:]
     
-    out = torch.tensor(out).float()   
+    #out = torch.tensor(out).float()   
     
-    return out, tax_dict
+    return pd.DataFrame(out), tax_dict
 
 def cirriculum_load(train_data, test_data, batch_size, test_size, cluster_names):
     """
@@ -417,25 +421,32 @@ def cirriculum_load(train_data, test_data, batch_size, test_size, cluster_names)
     
     return loaders
 
-def remove_rare(train_orig, test_orig, thresh):
+def remove_rare(train_orig, test_orig, cluster_names, thresh):
     """
-    Remove rare features from dataset
+    Remove rare features from dataset (train + test)
     
     Arguments:
-    train_orig -- train dataset before producing corrupted genomes (df)
-    test_orig -- test dataset before producing corrupted genomes (df)
-    thresh -- genes occur fewer than this many times in train dataset 
-        will be removed from train and test datasets (int)
+    train_orig (dataframe) -- train dataset before producing corrupted genomes 
+    test_orig (dataframe) -- test dataset before producing corrupted genomes
+    thresh (int) -- genes occur fewer than this many times in train dataset 
+        will be removed from train and test datasets 
     
     Returns:
-    train_orig2 -- train_orig minus rare features (df)
-    test_orig2 -- test_orig minus rare features (df)
+    train_orig2 (dataframe) -- train_orig minus rare features
+    test_orig2 (dataframe) -- test_orig minus rare features 
     """
     
-    mask = [i for i,val in enumerate(train_orig.sum()) if val < thresh ]
+    mask = [i for i,val in enumerate(train_orig.sum()) if val < thresh ] # indices of features to drop
     cat_df = pd.concat([train_orig, test_orig])
     cat_df = cat_df.drop(cat_df.columns[mask], axis=1)
     train_orig = cat_df.head(len(train_orig))
     test_orig = cat_df.tail(len(test_orig))
     
-    return train_orig, test_orig
+    cn2 = [val for i,val in enumerate(cluster_names) if i not in mask]
+    
+    return train_orig, test_orig, cn2
+
+
+
+
+

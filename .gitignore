@@ -1,4 +1,5 @@
-.DS_Store
-.ipynb_checkpo
+\.DS_Store
+.ipynb_checkpoints/
 data/
 __pycache__
+autoencoder_weights.txt
