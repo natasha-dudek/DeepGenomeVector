@@ -131,8 +131,6 @@ def train_test_split(df, cluster_names, n_test, path, genome_to_num):#, batch_si
     data_source -- what time of data you're trying to load ['get_homologues' | 'kegg']
     
     Returns:
-    train_dl -- training set dataloader (torch tensor subset)
-    test_dl -- test set dataloader (torch tensor subset)
     train -- full training set (torch tensor)
     test -- full test set (torch tensor)
     num_clusters -- the number of features in your dataset 
@@ -190,7 +188,7 @@ def dataloaders(train_data, test_data, batch_size, test_size, cluster_names):
     train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
     
     test_ds = TensorDataset(x_test, y_test)
-    test_dl = DataLoader(test_ds, batch_size=batch_size)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=True)
     
     loaders={}
     loaders['train'] = train_dl
@@ -413,7 +411,7 @@ def cirriculum_load(train_data, test_data, batch_size, test_size, cluster_names)
     large_train_dl = DataLoader(large_train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
 
     test_ds = TensorDataset(x_test, y_test)
-    test_dl = DataLoader(test_ds, batch_size=batch_size)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=True)
     
     loaders={}
     loaders['train'] = [small_train_dl, medium_train_dl, large_train_dl]
