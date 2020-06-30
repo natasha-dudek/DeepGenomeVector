@@ -117,8 +117,8 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 	#pos_weight = torch.tensor(neg/pos)
 	#criterion = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=pos_weight)
 	#criterion = nn.BCEWithLogitsLoss(reduction='sum')
-	#criterion = nn.BCELoss(reduction='sum')
-	criterion = nn.BCEWithLogitsLoss(reduction='sum')
+	criterion = nn.BCELoss(reduction='sum')
+	#criterion = nn.BCEWithLogitsLoss(reduction='sum')
 	
 	# Use gpu if available
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -444,7 +444,47 @@ def remove_rare(train_orig, test_orig, cluster_names, thresh):
     
     return train_orig, test_orig, cn2
 
+def date_time():
+	from datetime import datetime
+	
+	dateTimeObj = datetime.now()
+	date = str(dateTimeObj.day)+"-"+str(dateTimeObj.month)+"-"+str(dateTimeObj.year)
+	time = "_"+str(dateTimeObj.hour)+"-"+str(dateTimeObj.minute)+"-"+str(dateTimeObj.second)
+	return date+time
 
+def log_results(roc, optim_lc, perf_lc, flags, model):
 
+	import git
+	
+	datetime = date_time()
+	save_path = "log/"+datetime+"/"
+	
+	os.system("mkdir "+save_path)
+	
+	settings = open(save_path+"settings.txt","w")
+	
+	# Save hash for git repo
+	repo = git.Repo()
+	repo_hash = repo.head.object.hexsha
+	settings.write("Repo hash: "+repo_hash+"\n")
+
+	# Save flags from Namespace (hyperparams, etc)
+	for i in vars(flags):
+		settings.write(i+": "+str(vars(flags)[i])+"\n")
+	
+	settings.close()
+	
+	# Save useful figures
+	roc.savefig(save_path+"roc.png", dpi=200)
+	optim_lc.savefig(save_path+"optim_lc.png", dpi=200)
+	perf_lc.savefig(save_path+"perf_lc.png", dpi=200)
+	
+	# Save model
+	torch.save(model, save_path+"model.pt")
+	
+	
+	
+	
+	
 
 

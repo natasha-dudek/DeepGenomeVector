@@ -74,8 +74,10 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
 		ax.axvspan(x1, x2, alpha=0.5, color='black')
 		ax.axvspan(x3, x4, alpha=0.5, color='black')
 		
-	plt.show()
-
+	#plt.show()
+	return fig
+	
+	
 def calc_svd(data):
 	"""
 	Perform truncated SVD on data (note: SVD works efficiently on sparse matrices, unlike PCA)
@@ -397,4 +399,6 @@ def my_roc_curve(target, y_probas):
 	plt.ylabel('True Positive Rate')
 	plt.title('ROC curves for micro-average + 50 randomly selected genes')
 	plt.legend(loc="lower right")
-	plt.show()
+	#plt.show()
+	
+	return fig
