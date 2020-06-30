@@ -25,7 +25,6 @@ class AutoEncoder(nn.Module):
 		self.d3 = nn.Linear(int(num_clusters/(8*n)), int(num_clusters/(6*n)))
 		self.d4 = nn.Linear(int(num_clusters/(6*n)), int(num_clusters/(4*n)))
 		self.d5 = nn.Linear(int(num_clusters/(4*n)), int(num_clusters/(2*n)))
-		
 		self.output_layer = nn.Linear(int(num_clusters/(2*n)), num_clusters)
 		
 	def forward(self,x):
@@ -46,6 +45,7 @@ class AutoEncoder(nn.Module):
 		x = torch.sigmoid(self.output_layer(x)) 
 		
 		return x
+
 	
 	def encode(self, x):
 		# Return autoencoder latent space
@@ -55,6 +55,6 @@ class AutoEncoder(nn.Module):
 		x = F.relu(self.e4(x))
 		x = F.relu(self.e5(x))
 				
-		x = torch.sigmoid(self.lv(x))
+		#x = torch.sigmoid(self.lv(x))
 		
 		return x

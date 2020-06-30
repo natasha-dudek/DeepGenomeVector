@@ -8,6 +8,8 @@ import torch
 import math
 from collections import defaultdict
 from collections import OrderedDict
+from sklearn.metrics import roc_curve, auc
+import random
 
 def learning_curve(train_y, test_y, type_curve, cirriculum):
 	"""
@@ -41,8 +43,10 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
 		else:
 			x_losses = x_losses[:len(train_y)]
 			test_y = train_y[:len(train_y)]
-	fig, ax = plt.subplots(figsize=(20, 7))
-	#fig=plt.figure()
+			
+#	fig, ax = plt.subplots(figsize=(20, 7))
+	fig=plt.figure(figsize=(20, 7))
+
 	ax=fig.add_subplot(111)
 
 	ax.plot(x_losses,train_y,marker='o', c='b',label='Training',fillstyle='none')
@@ -52,22 +56,17 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
 	if type_curve == "optimization":
 		plt.title("Optimization Learning Curve")
 		plt.ylabel("BCE loss")
-		plt.xlabel("Experience (batches)")
+		plt.xlabel("Experience")
 	elif type_curve == "performance":
 		plt.title("Performance Learning Curve")
 		plt.ylabel("F1 score")
-		plt.xlabel("Experience (batches)")
+		plt.xlabel("Experience")
 	else:
 		plt.title(type_curve+" Learning Curve")
 		plt.xlabel("Experience (batches)")
 	
 	if cirriculum:
 		switch =  int(len(x_losses) / 3)
-#		plt.axvline(x=switch) 
-#		plt.axvline(x=2*switch) 
-#		plt.axvline(x=2*switch -1) 
-#		plt.axvline(x=2*switch) 
-		
 		x1 = switch - 1
 		x2 = switch
 		x3 = 2*switch -1
@@ -355,6 +354,47 @@ def hist_prob_ko(train_data):
 	plt.ylabel('Frequency')
 		
 	
+def my_roc_curve(target, y_probas):
+	"""
+	Performs ROC / AUC calculations and plots ROC curve
 	
+	Arguments:
+	target (numpy.ndarray) -- uncorrupted version of genomes (n_genomes, n_features)
+	y_probas (numpy.ndarray) -- prediction for uncorrupted genomes (n_genomes, n_features)
+	"""
 	
+	# ROC/AUC calculations
+	fpr = dict()
+	tpr = dict()
+	roc_auc = dict()	
+	for i in range(target.shape[1]):
+	    fpr[i], tpr[i], _ = roc_curve(target[:, i], y_probas[:, i])
+	    roc_auc[i] = auc(fpr[i], tpr[i])
+
+	fpr["micro"], tpr["micro"], _ = roc_curve(target.ravel(), y_probas.ravel())
+	roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 	
+	n_examples = 50 # will plot 50 example genes on ROC curve
+	
+	# get colours for plotting
+	cm = plt.cm.get_cmap('gist_rainbow')
+	c = np.linspace(0, 1, 50) # start, stop, how_many
+	colours = [cm(i) for i in c]
+	colours = colours*2
+	
+	# plot
+	fig, ax = plt.subplots(figsize=(20, 7))
+	a = random.sample(range(target.shape[1]), 50)
+	for i in range(len(a)):
+	    plt.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5,
+	         lw=2) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
+	plt.plot(fpr["micro"], tpr["micro"], color='red', 
+	         lw=5, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
+	plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
+	plt.xlim([0.0, 1.0])
+	plt.ylim([0.0, 1.05])
+	plt.xlabel('False Positive Rate')
+	plt.ylabel('True Positive Rate')
+	plt.title('ROC curves for micro-average + 50 randomly selected genes')
+	plt.legend(loc="lower right")
+	plt.show()

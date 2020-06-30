@@ -5,6 +5,7 @@ from sklearn.preprocessing import Binarizer
 from sklearn.metrics import accuracy_score, pairwise_distances
 from torch.autograd import Variable
 import random
+import numpy as np
 
 def f1_score(pred_non_bin, target, replacement_threshold):
 	"""
@@ -104,12 +105,21 @@ def pick_loader(epoch, stage, loaders):
 	
 	return loader, load_tracker
 	
-def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP, replacement_threshold, cluster_names, cirriculum, weight_decay):
+def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP, replacement_threshold, cluster_names, cirriculum, weight_decay, train_data):
 	# define optimization strategy
 	# L2 regularization in pytorch: https://discuss.pytorch.org/t/simple-l2-regularization/139
 	# Adam weight decay: https://www.fast.ai/2018/07/02/adam-weight-decay/
 	optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay) # weight_decay term = L2 regularization
-	criterion = nn.BCELoss(reduction='sum')
+	# weight loss function to counteract data imbalance
+#	total = train_data.shape[0]
+#	pos = np.sum(train_data.detach().numpy(), axis=0)
+#	neg = total - pos
+	#pos_weight = torch.tensor(neg/pos)
+	#criterion = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=pos_weight)
+	#criterion = nn.BCEWithLogitsLoss(reduction='sum')
+	#criterion = nn.BCELoss(reduction='sum')
+	criterion = nn.BCEWithLogitsLoss(reduction='sum')
+	
 	# Use gpu if available
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device, dtype= torch.float)
@@ -145,11 +155,7 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 			# Compute the model output
 			pred = model(train_data)
 			# Calculate and save loss
-			#loss = criterion(pred, train_data)
 			loss = criterion(pred, target)
-			
-			#losses.append(loss.cpu().data.item())  
-			#train_losses.append(loss.cpu().data.item())  
 			# Perform backpropagation
 			loss.backward()
 			# Update weights
