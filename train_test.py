@@ -111,14 +111,14 @@ def train_model(loaders, model, lr, num_epochs, print_every, batch_size, SAVE_FP
 	# Adam weight decay: https://www.fast.ai/2018/07/02/adam-weight-decay/
 	optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay) # weight_decay term = L2 regularization
 	# weight loss function to counteract data imbalance
-	total = train_data.shape[0]
-	pos = np.sum(train_data.detach().numpy(), axis=0)
-	neg = total - pos
-		
+#	total = train_data.shape[0]
+#	pos = np.sum(train_data.detach().numpy(), axis=0)
+#	neg = total - pos
 	#pos_weight = torch.tensor(neg/pos)
 	#criterion = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=pos_weight)
 	#criterion = nn.BCEWithLogitsLoss(reduction='sum')
-	criterion = nn.BCELoss(reduction='sum')
+	#criterion = nn.BCELoss(reduction='sum')
+	criterion = nn.BCEWithLogitsLoss(reduction='sum')
 	
 	# Use gpu if available
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
