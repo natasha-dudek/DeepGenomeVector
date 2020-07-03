@@ -9,6 +9,11 @@ class AutoEncoder(nn.Module):
 		
 		n = 1
 		
+#		for i in len(nn_layers/2):
+#			foo = nn.Linear(num_clusters, int(num_clusters/(2*i)))
+#			setattr(self, 'e1', foo)
+		
+				
 		# Encoder
 		self.e1 = nn.Linear(num_clusters, int(num_clusters/(2*n)))
 		self.e2 = nn.Linear(int(num_clusters/(2*n)), int(num_clusters/(4*n)))
@@ -28,6 +33,9 @@ class AutoEncoder(nn.Module):
 		self.output_layer = nn.Linear(int(num_clusters/(2*n)), num_clusters)
 		
 	def forward(self,x):
+		
+		#getattr
+		
 		x = F.relu(self.e1(x))
 		x = F.relu(self.e2(x))
 		x = F.relu(self.e3(x))

@@ -157,7 +157,7 @@ def train_test_split(df, cluster_names, n_test, path, genome_to_num):#, batch_si
     
     return train, test
 
-def dataloaders(train_data, test_data, batch_size, test_size, cluster_names):
+def dataloaders(train_data, test_data, batch_size, test_size, num_features):
 
     """
     Creates dataloaders for corrupted and uncorrupted genomes
@@ -169,7 +169,7 @@ def dataloaders(train_data, test_data, batch_size, test_size, cluster_names):
         Each row represents a corrupted version of a genome + the uncorrupted genome concatenated together
     batch_size -- batch size for training set
     test_size -- batch size for test set
-    cluster_names -- list of names of clusters, used to know how many clusters there are / where to split corrupted vs uncorrupted
+    num_features -- number of features / genes
     
     Returns:
     loaders -- dict of dataloaders 
@@ -179,10 +179,10 @@ def dataloaders(train_data, test_data, batch_size, test_size, cluster_names):
     # Tutorial: https://www.codementor.io/@dejanbatanjac/pytorch-the-missing-manual-on-loading-mnist-dataset-wjeh5top7
     
     # tensors with corrupted genomes and then uncorrupted genomes in each row, torch.Tensor
-    x_train = train_data[:,:len(cluster_names)] # corrupted genomes in first half of matrix
-    y_train = train_data[:,len(cluster_names):] # uncorrupted in second half
-    x_test = test_data[:,:len(cluster_names)]
-    y_test = test_data[:,len(cluster_names):]
+    x_train = train_data[:,:num_features] # corrupted genomes in first half of matrix
+    y_train = train_data[:,num_features:] # uncorrupted in second half
+    x_test = test_data[:,:num_features]
+    y_test = test_data[:,num_features:]
     
     train_ds = TensorDataset(x_train, y_train)
     train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
@@ -452,7 +452,7 @@ def date_time():
 	time = "_"+str(dateTimeObj.hour)+"-"+str(dateTimeObj.minute)+"-"+str(dateTimeObj.second)
 	return date+time
 
-def log_results(roc, optim_lc, perf_lc, flags, model):
+def log_results(roc, optim_lc, perf_lc, flags, model, cm):
 
 	import git
 	
@@ -472,6 +472,8 @@ def log_results(roc, optim_lc, perf_lc, flags, model):
 	for i in vars(flags):
 		settings.write(i+": "+str(vars(flags)[i])+"\n")
 	
+	settings.write("\nconfusion matrix: \n")
+	cm.to_string(settings)
 	settings.close()
 	
 	# Save useful figures
