@@ -3,3 +3,4 @@
 data/
 __pycache__
 autoencoder_weights.txt
+log/
