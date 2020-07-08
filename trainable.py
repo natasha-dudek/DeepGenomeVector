@@ -28,6 +28,7 @@ from genome_embeddings import evaluate
 from genome_embeddings import models
 from genome_embeddings import train_test
 from genome_embeddings import util
+from genome_embeddings import models 
 
 DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
 
@@ -142,16 +143,6 @@ def cv_dataloader(batch_size, num_features, k):
 	
 	return {"train": train_dl, "cv": cv_dl}
 	
-def train_updates(epoch, num_epochs, idx, batch_per_epoch, loss):
-	print('\r Training epoch {}/{}, batch {}/{}, {} loader, \tLoss: {:.2f}'.format(
-						epoch + 1, # epoch just finished, 1-indexed
-						num_epochs, # total number of epochs
-						idx, # batch just finished
-						batch_per_epoch, # total number batches per epoch
-						loss 
-						)
-						)	 
-	
 def train(model, optimizer, loaders, criterion, num_epochs, epoch, device=torch.device("cpu")):	
 	model.train()
 	losses = []
@@ -167,14 +158,7 @@ def train(model, optimizer, loaders, criterion, num_epochs, epoch, device=torch.
 		loss = criterion(pred, target)
 		loss.backward()
 		optimizer.step()
-	
-	print ("done training")
-#		if batch_idx % 100 == 1:
-#			# print update
-#			train_updates(epoch, num_epochs, batch_idx, len(loaders['train']), loss.cpu().data.item())
 				
-	#return loss.item()
-			
 def cv(model, loaders, criterion, replacement_threshold, device=torch.device("cpu")):
 	model.eval()
 	with torch.no_grad():
@@ -197,8 +181,6 @@ def cv(model, loaders, criterion, replacement_threshold, device=torch.device("cp
 			
 	return loss.item(), f1	  
 
-from genome_embeddings import models 
-
 def train_AE(config, reporter):
 
 	#print("launching train_AE, lr:",config["lr"],"wd:",config["weight_decay"])
@@ -218,26 +200,35 @@ def train_AE(config, reporter):
 		weight_decay=config.get("weight_decay", 0.1)
 		)
 	criterion = nn.BCELoss(reduction='sum')
-	#loaders = get_dataloader(DATA_FP, batch_size, num_features)
 	loaders = cv_dataloader(batch_size, num_features, config["kfolds"])
 	
+#	for epoch in range(num_epochs):
+#		train(model, optimizer, loaders, criterion, num_epochs, epoch, device)
+#		test_losses, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)
+#		
+#		reporter(f1_score=test_f1)	
 	
-	losses = {"train":[], "cv":[]}
-	f1s = {"train":[], "cv":[]}
 	
-	# enumerate epochs
 	for epoch in range(num_epochs):
-		#print("Beginning training for epoch",epoch)
-		#train(model, optimizer, loaders, criterion, num_epochs, epoch, device)
-		#test_losses, test_f1 = test(model, loaders, criterion, config["replacement_threshold"], device)
-		train(model, optimizer, loaders, criterion, num_epochs, epoch, device)
-		test_losses, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)
+	
+		model.train()
+		losses = []
+			
+		# enumerate batches in epoch
+		for batch_idx, (data, target) in enumerate(loaders["train"]):
+			
+			if batch_idx > 3: break
+			
+			data, target = data.to(device), target.to(device)
+			optimizer.zero_grad()
+			pred = model(data)
+			loss = criterion(pred, target)
+			loss.backward()
+			optimizer.step()
 		
-	reporter(f1_score=test_f1)	
-		
-#		losses["train"].append(train_losses)
-#		losses["test"].append(test_losses)
-#		losses["train"].append(train_f1s)
-#		losses["test"].append(test_f1s)
-		
-#	return losses, f1s
+			
+			train_loss = loss.item()
+			train_f1 = f1_score(pred, target, config["replacement_threshold"])
+			test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)	
+			reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss)	
+	
