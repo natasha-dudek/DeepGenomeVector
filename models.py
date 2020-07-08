@@ -4,65 +4,50 @@ import torch.nn.functional as F
 
 class AutoEncoder(nn.Module):
 	
-	def __init__(self, num_clusters):
+	def __init__(self, num_clusters, nn_layers):
 		super(AutoEncoder, self).__init__()
 		
-		n = 1
+		# Useful reading:
+		# https://discuss.pytorch.org/t/how-to-create-mlp-model-with-arbitrary-number-of-hidden-layers/13124
+		# https://discuss.pytorch.org/t/when-should-i-use-nn-modulelist-and-when-should-i-use-nn-sequential/5463/12
 		
-#		for i in len(nn_layers/2):
-#			foo = nn.Linear(num_clusters, int(num_clusters/(2*i)))
-#			setattr(self, 'e1', foo)
-		
-				
+		self.nn_layers = nn_layers
+		self.layers = nn.ModuleList()
+
 		# Encoder
-		self.e1 = nn.Linear(num_clusters, int(num_clusters/(2*n)))
-		self.e2 = nn.Linear(int(num_clusters/(2*n)), int(num_clusters/(4*n)))
-		self.e3 = nn.Linear(int(num_clusters/(4*n)), int(num_clusters/(6*n)))
-		self.e4 = nn.Linear(int(num_clusters/(6*n)), int(num_clusters/(8*n)))
-		self.e5 = nn.Linear(int(num_clusters/(8*n)), int(num_clusters/(10*n)))
-		
-		# Latent View (bottleneck layer)
-		self.lv = nn.Linear(int(num_clusters/(10*n)), int(num_clusters/(12*n)))
+		division = 2
+		for i in range(int(nn_layers/2)):
+			if i == 0: in_num = 1
+			else: in_num = division-2
+			self.layers.append(nn.Linear(int(num_clusters/in_num), int(num_clusters/division)))
+			division += 2
 		
 		# Decoder
-		self.d1 = nn.Linear(int(num_clusters/(12*n)), int(num_clusters/(10*n)))
-		self.d2 = nn.Linear(int(num_clusters/(10*n)), int(num_clusters/(8*n)))
-		self.d3 = nn.Linear(int(num_clusters/(8*n)), int(num_clusters/(6*n)))
-		self.d4 = nn.Linear(int(num_clusters/(6*n)), int(num_clusters/(4*n)))
-		self.d5 = nn.Linear(int(num_clusters/(4*n)), int(num_clusters/(2*n)))
-		self.output_layer = nn.Linear(int(num_clusters/(2*n)), num_clusters)
+		division -= 2
+		for i in range(int(nn_layers/2)):
+			if i == int(nn_layers/2) - 1: out = 1
+			else: out = division-2			
+			self.layers.append(nn.Linear(int(num_clusters/division), int(num_clusters/out)))
+			division -= 2
+
 		
-	def forward(self,x):
+	def forward(self, x): 
 		
-		#getattr
-		
-		x = F.relu(self.e1(x))
-		x = F.relu(self.e2(x))
-		x = F.relu(self.e3(x))
-		x = F.relu(self.e4(x))
-		x = F.relu(self.e5(x))
-		
-		x = torch.sigmoid(self.lv(x))
-		
-		x = F.relu(self.d1(x))
-		x = F.relu(self.d2(x))
-		x = F.relu(self.d3(x))
-		x = F.relu(self.d4(x))
-		x = F.relu(self.d5(x))
-		
-		x = torch.sigmoid(self.output_layer(x)) 
+		# apply relu to all except last layer of nn
+		for i in range(len(self.layers) - 1):
+			x = F.relu(self.layers[i](x))
+		# Apply sigmoid to final output layer of decoder 
+		x = torch.sigmoid(self.layers[len(self.layers) - 1](x))
 		
 		return x
 
 	
 	def encode(self, x):
-		# Return autoencoder latent space
-		x = F.relu(self.e1(x))
-		x = F.relu(self.e2(x))
-		x = F.relu(self.e3(x))
-		x = F.relu(self.e4(x))
-		x = F.relu(self.e5(x))
-				
-		#x = torch.sigmoid(self.lv(x))
-		
+
+		# Encode and apply relu activation to all except code layer
+		for i in range(int(len(self.layers)/2) - 1):
+			x = F.relu(self.layers[i](x))
+		# Do not add non-linearity to code layer	
+		x = self.layers[int(len(self.layers)/2) - 1](x)
+					
 		return x

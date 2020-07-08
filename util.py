@@ -68,13 +68,13 @@ def corrupt(data, num_corruptions, corruption_fraction, cluster_names, mode, pat
     Stochastically drop KO's / modules from genomes
     
     Arguments:
-    data -- train or test dataset, pandas df
-    num_corruptions -- number of corrupted outputs to produce per input genome
-    corruption_fraction -- what % of KO's/mods to drop
+    data (df) -- train or test dataset
+    num_corruptions (int) -- number of corrupted outputs to produce per input genome
+    corruption_fraction (float) -- what % of KO's/mods to drop
     
     Returns:
-    out -- training set with corrupted genomes and then uncorrupted genomes in each row, torch.Tensor
-    genome_idx -- dict mapping genome idx in corrupt_train / corrupt_test to genome ID
+    out (tensor) -- training set with corrupted genomes and then uncorrupted genomes in each row
+    genome_idx (dict) -- maps genome idx in corrupt_train / corrupt_test to genome ID
         E.g.: genome_idx[i] -> 'T012839'
     """
 
@@ -109,11 +109,11 @@ def corrupt(data, num_corruptions, corruption_fraction, cluster_names, mode, pat
     out = torch.FloatTensor(out)
     
     if mode == "train":
-        torch.save(out, path+"corrupted_train.pt")
-        torch.save(genome_idx, path+"genome_idx_train.pt")
+        torch.save(out, path+"corrupted_train_0607.pt")
+        torch.save(genome_idx, path+"genome_idx_train_0607.pt")
     else:
-        torch.save(out, path+"corrupted_test.pt")
-        torch.save(genome_idx, path+"genome_idx_test.pt")
+        torch.save(out, path+"corrupted_test_0607.pt")
+        torch.save(genome_idx, path+"genome_idx_test_0607.pt")
              
     return out, genome_idx
 
@@ -163,9 +163,9 @@ def dataloaders(train_data, test_data, batch_size, test_size, num_features):
     Creates dataloaders for corrupted and uncorrupted genomes
     
     Arguments:
-    train_data -- tensor of training data 
+    train_data -- df of training data 
         Each row represents a corrupted version of a genome + the uncorrupted genome concatenated together
-    test_data -- tensor of test data
+    test_data -- df of test data
         Each row represents a corrupted version of a genome + the uncorrupted genome concatenated together
     batch_size -- batch size for training set
     test_size -- batch size for test set
