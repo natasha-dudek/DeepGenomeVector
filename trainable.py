@@ -190,7 +190,6 @@ def train_AE(config, reporter):
 	
 	num_epochs = int(config["num_epochs"])
 	batch_size = int(config["batch_size"])
-	print("batch_size",batch_size)
 	num_features = int(MemCache.train_data.shape[1]/2)
 	model = models.AutoEncoder(num_features, config["nn_layers"])
 	model = model.to(device)
@@ -201,14 +200,7 @@ def train_AE(config, reporter):
 		)
 	criterion = nn.BCELoss(reduction='sum')
 	loaders = cv_dataloader(batch_size, num_features, config["kfolds"])
-	
-#	for epoch in range(num_epochs):
-#		train(model, optimizer, loaders, criterion, num_epochs, epoch, device)
-#		test_losses, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)
-#		
-#		reporter(f1_score=test_f1)	
-	
-	
+
 	for epoch in range(num_epochs):
 	
 		model.train()
@@ -225,11 +217,21 @@ def train_AE(config, reporter):
 			loss = criterion(pred, target)
 			loss.backward()
 			optimizer.step()
-		
+			
+			# INCREASE BEFORE DOING THIS FOR REAL
 			if (batch_idx+1) % 10 == 1:
+				 
 				train_loss = loss.item()
 				train_f1 = f1_score(pred, target, config["replacement_threshold"])
 				test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)	
 				reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss)	
+		
+		torch.save(model.state_dict(), "./model.pt")	
+		
+		
+		
+		
+		
+		
+		
 	
-	#torch.save(model.state_dict(), "./model.pt")

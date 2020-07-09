@@ -5,3 +5,4 @@ __pycache__
 autoencoder_weights.txt
 log/
 cluster_names.txt
+TUNE_RESULT_DIR/
