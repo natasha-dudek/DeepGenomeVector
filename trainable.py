@@ -217,7 +217,7 @@ def train_AE(config, reporter):
 		# enumerate batches in epoch
 		for batch_idx, (data, target) in enumerate(loaders["train"]):
 			
-			if batch_idx > 3: break
+			if batch_idx > 9: break
 			
 			data, target = data.to(device), target.to(device)
 			optimizer.zero_grad()
@@ -226,9 +226,10 @@ def train_AE(config, reporter):
 			loss.backward()
 			optimizer.step()
 		
-			
-			train_loss = loss.item()
-			train_f1 = f1_score(pred, target, config["replacement_threshold"])
-			test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)	
-			reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss)	
+			if (batch_idx+1) % 10 == 1:
+				train_loss = loss.item()
+				train_f1 = f1_score(pred, target, config["replacement_threshold"])
+				test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)	
+				reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss)	
 	
+	#torch.save(model.state_dict(), "./model.pt")
