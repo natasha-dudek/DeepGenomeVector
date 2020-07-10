@@ -16,6 +16,8 @@ import pickle
 from skorch.dataset import CVSplit
 from torch.utils.data import DataLoader, TensorDataset
 
+
+from ray.tune.stopper import Stopper
 import ray
 from ray import tune
 from ray.tune import track
@@ -38,6 +40,13 @@ class MemCache:
 	genome_idx_train = torch.load(DATA_FP+"genome_idx_train.pt")
 	genome_idx_test = torch.load(DATA_FP+"genome_idx_test.pt")
 	
+	# To make predictions on (ROC + AUC)
+	num_features = int(train_data.shape[1]/2)
+	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
+	corrupt_test_data = tensor_test_data[:,:num_features]
+	target = tensor_test_data[:,num_features:].detach().numpy()
+	
+		
 def binarize(pred_tensor, replacement_threshold):
 	"""
 	Values below or equal to threshold are replaced by 0, else by 1
@@ -181,27 +190,119 @@ def cv(model, loaders, criterion, replacement_threshold, device=torch.device("cp
 			
 	return loss.item(), f1	  
 
-def train_AE(config, reporter):
+from sklearn.metrics import roc_auc_score
 
-	#print("launching train_AE, lr:",config["lr"],"wd:",config["weight_decay"])
+def roc_auc(model):
+	model.eval()
+	with torch.no_grad():
+	    y_probas = model(MemCache.corrupt_test_data)
+	#auc = roc_auc_score(MemCache.target, y_probas.numpy(), average="macro")
+	return y_probas
+
+class EarlyStopping(Stopper):
+    def __init__(self, metric, std=0.001, top=10, mode="min", patience=0):
+        """Create the EarlyStopping object.
+        Stops the entire experiment when the metric has plateaued
+        for more than the given amount of iterations specified in
+        the patience parameter.
+        Args:
+            metric (str): The metric to be monitored.
+            std (float): The minimal standard deviation after which
+                the tuning process has to stop.
+            top (int): The number of best model to consider.
+            mode (str): The mode to select the top results.
+                Can either be "min" or "max".
+            patience (int): Number of epochs to wait for
+                a change in the top models.
+        Raises:
+            ValueError: If the mode parameter is not "min" nor "max".
+            ValueError: If the top parameter is not an integer
+                greater than 1.
+            ValueError: If the standard deviation parameter is not
+                a strictly positive float.
+            ValueError: If the patience parameter is not
+                a strictly positive integer.
+        """
+        if mode not in ("min", "max"):
+            raise ValueError("The mode parameter can only be"
+                             " either min or max.")
+        if not isinstance(top, int) or top <= 1:
+            raise ValueError("Top results to consider must be"
+                             " a positive integer greater than one.")
+        if not isinstance(patience, int) or patience < 0:
+            raise ValueError("Patience must be"
+                             " a strictly positive integer.")
+        if not isinstance(std, float) or std <= 0:
+            raise ValueError("The standard deviation must be"
+                             " a strictly positive float number.")
+        self._mode = mode
+        self._metric = metric
+        self._patience = patience
+        self._iterations = 0
+        self._std = std
+        self._top = top
+        self._top_values = []
+
+    def __call__(self, trial_id, result):
+        """Return a boolean representing if the tuning has to stop."""
+        self._top_values.append(result[self._metric])
+        if self._mode == "min":
+            self._top_values = sorted(self._top_values)[:self._top]
+        else:
+            self._top_values = sorted(self._top_values)[-self._top:]
+
+        # If the current iteration has to stop
+        if self.has_plateaued():
+            # we increment the total counter of iterations
+            self._iterations += 1
+        else:
+            # otherwise we reset the counter
+            self._iterations = 0
+
+        # and then call the method that re-executes
+        # the checks, including the iterations.
+        return self.stop_all()
+
+    def has_plateaued(self):
+        return (len(self._top_values) == self._top
+                and np.std(self._top_values) <= self._std)
+
+    def stop_all(self):
+        """Return whether to stop and prevent trials from starting."""
+        return self.has_plateaued() and self._iterations >= self._patience
+
+
 	
+def train_AE(config, reporter):
+	
+	print(config)
+	
+              
 	use_cuda = config.get("use_gpu") and torch.cuda.is_available()
 	device = torch.device("cuda" if use_cuda else "cpu")
 	
-	num_epochs = int(config["num_epochs"])
-	batch_size = int(config["batch_size"])
-	num_features = int(MemCache.train_data.shape[1]/2)
-	model = models.AutoEncoder(num_features, config["nn_layers"])
+	num_features2 = MemCache.num_features
+		
+	model = models.AutoEncoder(num_features2, int(config["nn_layers"]))
 	model = model.to(device)
-	optimizer = optim.Adam(
-		model.parameters(),
-		lr=config.get("lr", 0.001),
-		weight_decay=config.get("weight_decay", 0.1)
-		)
+	
+	if config["optimizer"] == "adam":
+		optimizer = optim.Adam(
+			model.parameters(),
+			lr=config["lr"],
+			weight_decay=config["weight_decay"]
+			)
+	elif config["optimizer"] == "sgd":
+		optimizer = optim.SGD(
+			model.parameters(),
+			lr=config["lr"],
+			weight_decay=config["weight_decay"]
+			)	
+			
 	criterion = nn.BCELoss(reduction='sum')
-	loaders = cv_dataloader(batch_size, num_features, config["kfolds"])
-
-	for epoch in range(num_epochs):
+	loaders = cv_dataloader(config["batch_size"], num_features2, config["kfolds"])
+		
+	for epoch in range(config["num_epochs"]):
 	
 		model.train()
 		losses = []
@@ -209,6 +310,7 @@ def train_AE(config, reporter):
 		# enumerate batches in epoch
 		for batch_idx, (data, target) in enumerate(loaders["train"]):
 			
+			# DELETE EVENTUALLY
 			if batch_idx > 9: break
 			
 			data, target = data.to(device), target.to(device)
@@ -218,15 +320,19 @@ def train_AE(config, reporter):
 			loss.backward()
 			optimizer.step()
 			
-			# INCREASE BEFORE DOING THIS FOR REAL
+			# SET T0 100 EVENTUALLY
 			if (batch_idx+1) % 10 == 1:
 				 
 				train_loss = loss.item()
 				train_f1 = f1_score(pred, target, config["replacement_threshold"])
-				test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)	
-				reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss)	
+				test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)
+				y_probas = roc_auc(model)
+				# SAVE Y_PROBA
+				#print("auc",auc)
+				reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss) #, auc_score=auc)	
 		
-		torch.save(model.state_dict(), "./model.pt")	
+		torch.save(model.state_dict(), "./model.pt")
+		torch.save(y_probas, "./y_probas.pt")	
 		
 		
 		
