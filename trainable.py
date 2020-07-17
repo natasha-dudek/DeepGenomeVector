@@ -13,9 +13,9 @@ import sklearn as sk
 from sklearn.preprocessing import Binarizer
 import time
 import pickle
-from skorch.dataset import CVSplit
+#from skorch.dataset import CVSplit
 from torch.utils.data import DataLoader, TensorDataset
-
+import sys
 
 from ray.tune.stopper import Stopper
 import ray
@@ -32,19 +32,36 @@ from genome_embeddings import train_test
 from genome_embeddings import util
 from genome_embeddings import models 
 
-DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+#DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+#DATA_FP = '/home/ndudek/projects/def-dprecup/ndudek/'
 
 class MemCache:
-	train_data = torch.load(DATA_FP+"corrupted_train.pt")
-	test_data = torch.load(DATA_FP+"corrupted_test.pt")
-	genome_idx_train = torch.load(DATA_FP+"genome_idx_train.pt")
-	genome_idx_test = torch.load(DATA_FP+"genome_idx_test.pt")
-	
-	# To make predictions on (ROC + AUC)
+	###########################
+	# TO RUN ON CC:
+	train_data=np.loadtxt("/home/ndudek/projects/def-dprecup/ndudek/corrupted_train_1407.txt")
+	test_data=np.loadtxt("/home/ndudek/projects/def-dprecup/ndudek/corrupted_test_1407.txt")
+	 To make predictions on (ROC + AUC)
 	num_features = int(train_data.shape[1]/2)
-	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
+	tensor_test_data = torch.tensor(test_data).float()
 	corrupt_test_data = tensor_test_data[:,:num_features]
-	target = tensor_test_data[:,num_features:].detach().numpy()
+	target = torch.tensor(tensor_test_data[:,num_features:])
+	
+	###########################
+	# TO RUN ON LAPTOP
+	
+#	train_data = torch.load("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/corrupted_train.pt")
+#	test_data = torch.load("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/corrupted_test.pt")
+#	# To make predictions on (ROC + AUC)
+#	num_features = int(train_data.shape[1]/2)
+#	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
+#	corrupt_test_data = tensor_test_data[:,:num_features]
+#	target = tensor_test_data[:,num_features:].detach().numpy()
+#	
+#	print("loading genome_to_tax")
+#	genome_to_tax = np.load('genome_to_tax.npy',allow_pickle='TRUE').item()
+#	genome_idx_train = torch.load(DATA_FP+"genome_idx_train.pt")
+#	genome_idx_test = torch.load(DATA_FP+"genome_idx_test.pt")
+	
 	
 		
 def binarize(pred_tensor, replacement_threshold):
@@ -90,19 +107,6 @@ def f1_score(pred_non_bin, target, replacement_threshold):
 	
 	return sum(f1s)/len(f1s)
 
-def get_dataloader(DATA_FP, batch_size, num_features):
-	
-	# load data from memory (faster than re-loading from scratch every time)
-	train_data = MemCache.train_data
-	test_data = MemCache.test_data
-	genome_idx_train = MemCache.genome_idx_train
-	genome_idx_test = MemCache.genome_idx_test
-	
-	# Create dataloaders for this experimental run
-	loaders = util.dataloaders(train_data, test_data, batch_size, batch_size, num_features)	
-	
-	return loaders
-
 
 def cv_dataloader(batch_size, num_features, k):
 
@@ -124,9 +128,9 @@ def cv_dataloader(batch_size, num_features, k):
 	train_data = MemCache.train_data
 	#genome_idx_train = MemCache.genome_idx_train
 	
-	# split X and y
-	X = train_data[:,:num_features] # corrupted genomes in first half of matrix columns
-	y = train_data[:,num_features:] # uncorrupted in second half of matrix columns
+#	# split X and y
+#	X = train_data[:,:num_features]  corrupted genomes in first half of matrix columns
+#	y = train_data[:,num_features:]  uncorrupted in second half of matrix columns
 	
 	# Create dataloader with folds 
 #	train_ds = TensorDataset(X, y)
@@ -134,15 +138,29 @@ def cv_dataloader(batch_size, num_features, k):
 #	train_dl = splitter(train_ds)
 
 	# Create random split for 1-time k-fold validation
-	idx_genomes = [i for i in range(len(X))]
-	num_cv = int(len(idx_genomes) / k )
-	num_train = len(idx_genomes) - num_cv
-	cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
-	train_idx = list(set(idx_genomes) - set(cv_idx))	
-	X_train = X[train_idx]
-	y_train = y[train_idx]
-	X_cv= X[cv_idx]
-	y_cv = y[cv_idx]
+#	idx_genomes = [i for i in range(len(X))]
+#	num_cv = int(len(idx_genomes) / k )
+#	num_train = len(idx_genomes) - num_cv
+#	cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
+#	train_idx = list(set(idx_genomes) - set(cv_idx))	
+#	X_train = X[train_idx]
+#	y_train = y[train_idx]
+#	X_cv= X[cv_idx]
+#	y_cv = y[cv_idx]
+	
+	# Create stratified split for 1-time k-fold CV by phylum
+	genome_idx_train = MemCache.genome_idx_train
+	genome_to_tax = MemCache.genome_to_tax
+	df = pd.DataFrame(train_data.numpy())
+	9fold, 1fold_df = balanced_split(df, 0.1, genome_to_tax, num_to_genome, genome_idx_train)
+	train_set = torch.tensor(9fold)
+	cv_set = torch.tensor(1fold)
+
+	# split X and y for training test
+	X_train = train_set[:,:num_features] # corrupted genomes in first half of matrix columns
+	y_train = train_set[:,num_features:] # uncorrupted in second half of matrix columns
+	X_cv = cv_set[:,:num_features]
+	y_cv = cv_set[:,num_features:]
 	
 	# Create dataloaders
 	train_ds = TensorDataset(X_train, y_train)
@@ -274,10 +292,7 @@ class EarlyStopping(Stopper):
 
 	
 def train_AE(config, reporter):
-	
-	print(config)
-	
-              
+	    
 	use_cuda = config.get("use_gpu") and torch.cuda.is_available()
 	device = torch.device("cuda" if use_cuda else "cpu")
 	
@@ -286,16 +301,8 @@ def train_AE(config, reporter):
 	model = models.AutoEncoder(num_features2, int(config["nn_layers"]))
 	model = model.to(device)
 	
-	if config["optimizer"] == "adam":
-		optimizer = optim.Adam(
+	optimizer = optim.SGD(
 			model.parameters(),
-			lr=config["lr"],
-			weight_decay=config["weight_decay"]
-			)
-	elif config["optimizer"] == "sgd":
-		optimizer = optim.SGD(
-			model.parameters(),
-			lr=config["lr"],
 			weight_decay=config["weight_decay"]
 			)	
 			

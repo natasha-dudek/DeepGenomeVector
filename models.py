@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 class AutoEncoder(nn.Module):
 	
@@ -13,29 +14,31 @@ class AutoEncoder(nn.Module):
 		# Weight init: https://www.deeplearningwizard.com/deep_learning/boosting_models_pytorch/weight_initialization_activation_functions/
 		self.nn_layers = nn_layers
 		self.layers = nn.ModuleList()
+		
 
 		# Encoder
-		division = 2
+		in_num = num_clusters
 		for i in range(int(nn_layers/2)):
-			if i == 0: in_num = 1
-			else: in_num = division-2
-			self.layers.append(nn.Linear(int(num_clusters/in_num), int(num_clusters/division)))
+			out_num = int(in_num/2)
+			self.layers.append(nn.Linear(in_num, out_num))
 			nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
-			division += 2
-		
+			in_num = out_num
+								
 		# Decoder
-		division -= 2
 		for i in range(int(nn_layers/2)):
-			if i == int(nn_layers/2) - 1: out = 1
-			else: out = division-2			
-			self.layers.append(nn.Linear(int(num_clusters/division), int(num_clusters/out)))
-						
-			if i == (int(nn_layers/2) - 1): # last layer has sigmoid activation, use Xavier instead of He
+			out_num = int(in_num*2)
+			
+			# last layer should have exactly num_clusters features
+			# last layer has sigmoid activation, use Xavier instead of He
+			if i == (int(nn_layers/2) - 1): 
+				self.layers.append(nn.Linear(in_num, num_clusters))
 				nn.init.xavier_normal_(self.layers[-1].weight)
 			else:
+				self.layers.append(nn.Linear(in_num, out_num))
 				nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
-				
-			division -= 2
+			
+			in_num = out_num	
+		
 
 		
 	def forward(self, x): 

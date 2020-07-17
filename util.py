@@ -22,7 +22,7 @@ def genome_to_tax(df):
             continue
         genome_to_tax[s.split()[2]] = s.split(" ")[3]
     
-    tax = [genome_to_tax[i] for i in list(df.index)] # list(df.index) is genome names T01278
+    #tax = [genome_to_tax[i] for i in list(df.index)] # list(df.index) is genome names T01278
 
     return genome_to_tax
     
@@ -109,11 +109,13 @@ def corrupt(data, num_corruptions, corruption_fraction, cluster_names, mode, pat
     out = torch.FloatTensor(out)
     
     if mode == "train":
-        torch.save(out, path+"corrupted_train_0607.pt")
-        torch.save(genome_idx, path+"genome_idx_train_0607.pt")
+        torch.save(out, path+"corrupted_train_07-17-20.pt")
+        np.savetxt(path+"corrupted_train_07-17-20.txt", out.numpy())
+        torch.save(genome_idx, path+"genome_idx_train_07-17-20.pt")
     else:
-        torch.save(out, path+"corrupted_test_0607.pt")
-        torch.save(genome_idx, path+"genome_idx_test_0607.pt")
+        torch.save(out, path+"corrupted_test_07-17-20.pt")
+        np.savetxt(path+"corrupted_test_07-17-20.txt", out.numpy())
+        torch.save(genome_idx, path+"genome_idx_test_07-17-20.pt")
              
     return out, genome_idx
 
@@ -196,7 +198,7 @@ def dataloaders(train_data, test_data, batch_size, test_size, num_features):
     
     return loaders
 
-def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
+def balanced_split(df, n_test, genome_to_tax, num_to_genome, path=None, genome_idx_train=None):
     """
     Creates phylogenetically balanced train-test split at domain + phylum levels
     
@@ -216,13 +218,19 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
     train_split --  df containing training data (rows = genomes)
     test_split --- df containing test data (rows = genomes)
     """
-    
-    #Default dict where keys are domains and valyes are a list of occurences of each phylum within the domain
+    	
+    # Dict where keys are domains and valyes are a list of occurences of each phylum within the domain
     # E.g.: within Bacteria [Gammaprot, Bacteroidetes, Gammaprot, Actino, ...]
     # get tax of genomes in ds (genome_to_tax has 3474 genomes, we're using only 3432 in ds)
+    
     genome_to_tax2 = {}
-    for i in df.index:
-        genome_to_tax2[i] = genome_to_tax[i]
+    
+    if genome_idx_train is not None:
+	    for i in df.index:
+	        genome_to_tax2[i] = genome_to_tax[genome_idx_train[i]]    
+    else:
+	    for i in df.index:
+	        genome_to_tax2[i] = genome_to_tax[i]
 
     tensor_df = torch.tensor(df.values)
     
@@ -303,8 +311,9 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path):
     test_df = pd.DataFrame.from_dict(test_split, orient='index')
     
     # save files
-    train_df.to_csv(path+"uncorrupted_train_balanced.csv", index_label=0)
-    test_df.to_csv(path+"uncorrupted_test_balanced.csv", index_label=0)
+    if path is not None:
+	    train_df.to_csv(path+"uncorrupted_train_balanced.csv", index_label=0)
+	    test_df.to_csv(path+"uncorrupted_test_balanced.csv", index_label=0)
     
     # some helpful stats
     num_train = len(test_train['train'])
