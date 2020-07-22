@@ -35,6 +35,16 @@ from genome_embeddings import models
 
 #DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
 #DATA_FP = '/home/ndudek/projects/def-dprecup/ndudek/'
+os.system("rm file_tout")
+os.system("rm file_terr")
+
+sys.stdout = open('file_tout', 'w')
+sys.stderr = open('file_terr', 'w')
+
+print("version 1")
+
+sys.stdout.flush()
+sys.stderr.flush()
 
 class MemCache:
     ###########################
@@ -146,8 +156,8 @@ def cv_dataloader(batch_size, num_features, k):
     train_data = MemCache.train_data
     
 #    # split X and y
-#    X = train_data[:,:num_features]  corrupted genomes in first half of matrix columns
-#    y = train_data[:,num_features:]  uncorrupted in second half of matrix columns
+    X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+    y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
     
     # Create dataloader with folds 
 #    train_ds = TensorDataset(X, y)
@@ -155,30 +165,28 @@ def cv_dataloader(batch_size, num_features, k):
 #    train_dl = splitter(train_ds)
 
     # Create random split for 1-time k-fold validation
-#    idx_genomes = [i for i in range(len(X))]
-#    num_cv = int(len(idx_genomes) / k )
-#    num_train = len(idx_genomes) - num_cv
-#    cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
-#    train_idx = list(set(idx_genomes) - set(cv_idx))    
-#    X_train = X[train_idx]
-#    y_train = y[train_idx]
-#    X_cv= X[cv_idx]
-#    y_cv = y[cv_idx]
+    idx_genomes = [i for i in range(len(X))]
+    num_cv = int(len(idx_genomes) / k )
+    num_train = len(idx_genomes) - num_cv
+    cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
+    train_idx = list(set(idx_genomes) - set(cv_idx))    
+    X_train = X[train_idx]
+    y_train = y[train_idx]
+    X_cv= X[cv_idx]
+    y_cv = y[cv_idx]
     
     # Create stratified split for 1-time k-fold CV by phylum
-    genome_idx_train = MemCache.genome_idx_train
-    genome_to_tax = MemCache.genome_to_tax
-    df_train_data = MemCache.df_train_data
-
-    ninefold, onefold = util.balanced_split(df=df_train_data, n_test=0.1, genome_to_tax=genome_to_tax, num_to_genome=MemCache.num_to_genome, path=None, genome_idx_train=genome_idx_train)
-    train_set = ninefold.values  # ugg CC has pandas==0.23.4, does not support to_numpy()
-    cv_set = onefold.values
-
+#    genome_idx_train = MemCache.genome_idx_train
+#    genome_to_tax = MemCache.genome_to_tax
+#    df_train_data = MemCache.df_train_data
+#    ninefold, onefold = util.balanced_split(df=df_train_data, n_test=0.1, genome_to_tax=genome_to_tax, num_to_genome=MemCache.num_to_genome, path=None, genome_idx_train=genome_idx_train)
+#    train_set = ninefold.values  # ugg CC has pandas==0.23.4, does not support to_numpy()
+#    cv_set = onefold.values
     # split X and y for training test
-    X_train = train_set[:,:num_features] # corrupted genomes in first half of matrix columns
-    y_train = train_set[:,num_features:] # uncorrupted in second half of matrix columns
-    X_cv = cv_set[:,:num_features]
-    y_cv = cv_set[:,num_features:]
+#    X_train = train_set[:,:num_features] # corrupted genomes in first half of matrix columns
+#    y_train = train_set[:,num_features:] # uncorrupted in second half of matrix columns
+#    X_cv = cv_set[:,:num_features]
+#    y_cv = cv_set[:,num_features:]
     
     # Create dataloaders
     train_ds = TensorDataset(X_train, y_train)

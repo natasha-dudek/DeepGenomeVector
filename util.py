@@ -304,12 +304,12 @@ def balanced_split(df, n_test, genome_to_tax, num_to_genome, path=None, genome_i
 	for i in range(len(tensor_df)):
 			
 		if genome_idx_train is None:
-			print("why am i here?")
+			#print("why am i here?")
 			sys.stdout.flush()
 			sys.stderr.flush()
 			genome = num_to_genome[i] 
 		else:
-			print("this is where I should be")
+			#print("this is where I should be")
 			sys.stdout.flush()
 			sys.stderr.flush()
 			genome_num = genome_idx_train[i]
