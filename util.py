@@ -109,13 +109,13 @@ def corrupt(data, num_corruptions, corruption_fraction, cluster_names, mode, pat
 	out = torch.FloatTensor(out)
 	
 	if mode == "train":
-		torch.save(out, path+"corrupted_train_07-17-20.pt")
+		torch.save(out, path+"corrupted_train_22-07-20.pt")
 		np.savetxt(path+"corrupted_train_07-17-20.txt", out.numpy())
-		torch.save(genome_idx, path+"genome_idx_train_07-17-20.pt")
+		torch.save(genome_idx, path+"genome_idx_train_22-07-20.pt")
 	else:
-		torch.save(out, path+"corrupted_test_07-17-20.pt")
+		torch.save(out, path+"corrupted_test_22-07-20.pt")
 		np.savetxt(path+"corrupted_test_07-17-20.txt", out.numpy())
-		torch.save(genome_idx, path+"genome_idx_test_07-17-20.pt")
+		torch.save(genome_idx, path+"genome_idx_test_22-07-20.pt")
 			 
 	return out, genome_idx
 
