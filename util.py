@@ -10,6 +10,64 @@ from collections import defaultdict
 import random
 import pickle
 
+import struct
+
+### utils for message sending ###
+# These enconde how the length of the message in the message, so we can send messages
+# of variable lengths. We need async versions because the server uses asyncio, and non-async
+# versions because the client doesn't.
+# https://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
+def send_msg(sock, msg):
+    # Prefix each message with a 4-byte length (network byte order)
+    msg = struct.pack('>I', len(msg)) + msg
+    sock.sendall(msg)
+
+def recv_msg(sock):
+    # Read message length and unpack it into an integer
+    raw_msglen = recvall(sock, 4)
+    if not raw_msglen:
+        return None
+    msglen = struct.unpack('>I', raw_msglen)[0]
+    # Read the message data
+    return recvall(sock, msglen)
+
+def recvall(sock, n):
+    # Helper function to recv n bytes or return None if EOF is hit
+    data = bytearray()
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return data
+    
+async def recv_msg_async(sock):
+    # Read message length and unpack it into an integer
+    raw_msglen = await recvall_async(sock, 4)
+    if not raw_msglen:
+        return None
+    msglen = struct.unpack('>I', raw_msglen)[0]
+    # Read the message data
+    return await recvall_async(sock, msglen)
+    
+async def recvall_async(sock, n):
+    # Helper function to recv n bytes or return None if EOF is hit
+    data = bytearray()
+    while len(data) < n:
+        packet = await sock.read(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return data
+    
+def send_msg_asyncio(sock, msg):
+    # Prefix each message with a 4-byte length (network byte order)
+    msg = struct.pack('>I', len(msg)) + msg
+    sock.write(msg)
+### end message sending utils 
+
+
+
 def genome_to_tax(df):
 	file = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/selected_kegg.txt", "r").readlines()
 	file = map(str.strip, file)
