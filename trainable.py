@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import random
+from subprocess import Popen
 import argparse
 from filelock import FileLock
 import torch
@@ -31,10 +32,19 @@ from genome_embeddings import evaluate
 from genome_embeddings import models
 from genome_embeddings import train_test
 from genome_embeddings import util
-from genome_embeddings import models 
+from genome_embeddings import models
+from genome_embeddings.memcache_client import CachedDataset, wait_till_up
 
 #DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
 #DATA_FP = '/home/ndudek/projects/def-dprecup/ndudek/'
+memcache_executable = 'python3 memcache_server.py'
+print('running memcache server')
+memcache_proc = Popen(memcache_executable, shell=True)
+wait_till_up()
+print('memcache server started')
+
+
+
 os.system("rm file_tout")
 os.system("rm file_terr")
 
@@ -50,9 +60,9 @@ class MemCache:
 	###########################
 	# TO RUN ON CC:
 	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
-	train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
+#	train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
 	test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
-	df_train_data = pd.DataFrame(train_data)
+#	df_train_data = pd.DataFrame(train_data)
 
 #	train_data=np.loadtxt(DATA_FP+"mini_corrupted_train.txt")
 #	test_data=np.loadtxt(DATA_FP+"mini_corrupted_test.txt")
@@ -61,20 +71,20 @@ class MemCache:
 	genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
 	   
 	
-	df, cluster_names = util.load_data(DATA_FP, "kegg")
-	genome_to_num ={}
-	for i,genome in enumerate(df.index):
-		genome_to_num[genome] = i
-	num_to_genome = {v: k for k, v in genome_to_num.items()}
+#	df, cluster_names = util.load_data(DATA_FP, "kegg")
+#	genome_to_num ={}
+#	for i,genome in enumerate(df.index):
+#		genome_to_num[genome] = i
+#	num_to_genome = {v: k for k, v in genome_to_num.items()}
 	
 	# To make predictions on (ROC + AUC)
-	num_features = int(train_data.shape[1]/2)
+	num_features = int(test_data.shape[1]/2)
 	tensor_test_data = torch.tensor(test_data).float()
 	corrupt_test_data = tensor_test_data[:,:num_features]
 	target = tensor_test_data[:,num_features:].numpy() # no grad
 	
-	train_data = torch.Tensor(train_data)
-	test_data = torch.Tensor(test_data)
+#	train_data = torch.Tensor(train_data)
+#	test_data = torch.Tensor(test_data)
 	
 	###########################
 	# TO RUN ON LAPTOP
@@ -196,7 +206,8 @@ def cv_dataloader(batch_size, num_features, k):
 	# Create dataloaders
 	train_ds = TensorDataset(X_train, y_train)
 	cv_ds = TensorDataset(X_cv, y_cv)
-	train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
+	# train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
+	train_dl = DataLoader(CachedDataset(), batch_size=batch_size, drop_last=False, shuffle=True)
 	cv_dl = DataLoader(cv_ds, batch_size=batch_size, shuffle=True)
 	
 	return {"train": train_dl, "cv": cv_dl}

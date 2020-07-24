@@ -10,8 +10,9 @@ DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/
 
 # Keep data in numpy on the server side
 train_data = torch.load(DATA_FP+"corrupted_train_07-17-20.pt").numpy()
-test_data = torch.load(DATA_FP+"corrupted_test_07-17-20.pt").numpy()
-data = np.concatenate([train_data, test_data], 0)
+# test_data = torch.load(DATA_FP+"corrupted_test_07-17-20.pt").numpy()
+# data = np.concatenate([train_data, test_data], 0)
+data = train_data
 print(data.shape)
 #df, cluster_names = util.load_data(DATA_FP, "kegg")
 ## To make predictions on (ROC + AUC)
@@ -26,22 +27,23 @@ print(data.shape)
 #genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
 #df_train_data = pd.DataFrame(train_data.numpy()) 
 
+
 async def handle_client(reader, writer):
-	# request should be a list of indices that client wants
-#	request = (await reader.read(255)).decode('utf8')
-	# request = await reader.read(255)
-	request = await util.recv_msg_async(reader)
-	idx = np.frombuffer(request, np.int)
-	print(test_data.dtype)
-	response = test_data[idx].tobytes()
-	print(idx)
-	print(len(response))
-#	response = str(request) + 'bar'
-#	writer.write(response.encode('utf8'))
-	util.send_msg_asyncio(writer, response)
-	# writer.write(response)
-	await writer.drain()
-	writer.close()
+    # request should be a list of indices that client wants
+#    request = (await reader.read(255)).decode('utf8')
+    # request = await reader.read(255)
+    request = await util.recv_msg_async(reader)
+    idx = np.frombuffer(request, np.int)
+    if len(idx) > 0:
+        response = data[idx].tobytes()
+    else: # means send the shape
+        response = np.array(data.shape, dtype=np.float32).tobytes()
+#    response = str(request) + 'bar'
+#    writer.write(response.encode('utf8'))
+    util.send_msg_asyncio(writer, response)
+    # writer.write(response)
+    await writer.drain()
+    writer.close()
 
 loop = asyncio.get_event_loop()
 loop.create_task(asyncio.start_server(handle_client, 'localhost', 15555))
