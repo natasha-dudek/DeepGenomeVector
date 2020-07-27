@@ -32,8 +32,10 @@ async def handle_client(reader, writer):
     # request should be a list of indices that client wants
 #    request = (await reader.read(255)).decode('utf8')
     # request = await reader.read(255)
+    print('handling request')
     request = await util.recv_msg_async(reader)
     idx = np.frombuffer(request, np.int)
+    print('requested idx', idx)
     if len(idx) > 0:
         response = data[idx].tobytes()
     else: # means send the shape

@@ -33,15 +33,20 @@ from genome_embeddings import models
 from genome_embeddings import train_test
 from genome_embeddings import util
 from genome_embeddings import models
-from genome_embeddings.memcache_client import CachedDataset, wait_till_up
+from genome_embeddings.memcache_client import CachedDataset, wait_till_up, get_train_data_size
 
-#DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
 #DATA_FP = '/home/ndudek/projects/def-dprecup/ndudek/'
 memcache_executable = 'python3 memcache_server.py'
 print('running memcache server')
-memcache_proc = Popen(memcache_executable, shell=True)
-wait_till_up()
+
+# UNCOMMENT TO RUN ON SERVER
+#memcache_proc = Popen(memcache_executable, shell=True)
+#wait_till_up()
+
+
 print('memcache server started')
+training_set_size, _ = get_train_data_size()
 
 
 
@@ -59,11 +64,14 @@ sys.stderr.flush()
 class MemCache:
 	###########################
 	# TO RUN ON CC:
-	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
+	DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+	#DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
 #	train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
-	test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
+	#test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
 #	df_train_data = pd.DataFrame(train_data)
-
+	
+	test_data = torch.load(DATA_FP+"corrupted_test_07-17-20.pt")
+	
 #	train_data=np.loadtxt(DATA_FP+"mini_corrupted_train.txt")
 #	test_data=np.loadtxt(DATA_FP+"mini_corrupted_test.txt")
 	genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy',allow_pickle='TRUE').item()
@@ -168,11 +176,13 @@ def cv_dataloader(batch_size, num_features, k):
 	train_dl (DataLoader) -- X and y training Datasets
 	"""
 	# load data from memory (faster than re-loading from scratch every time)
-	train_data = MemCache.train_data
+	# train_data = MemCache.train_data
+	
+	
 	
 #	# split X and y
-	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 	
 	# Create dataloader with folds 
 #	train_ds = TensorDataset(X, y)
@@ -180,15 +190,16 @@ def cv_dataloader(batch_size, num_features, k):
 #	train_dl = splitter(train_ds)
 
 	# Create random split for 1-time k-fold validation
-	idx_genomes = [i for i in range(len(X))]
+
+	idx_genomes = [i for i in range(training_set_size)]
 	num_cv = int(len(idx_genomes) / k )
 	num_train = len(idx_genomes) - num_cv
 	cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
 	train_idx = list(set(idx_genomes) - set(cv_idx))	
-	X_train = X[train_idx]
-	y_train = y[train_idx]
-	X_cv= X[cv_idx]
-	y_cv = y[cv_idx]
+#	X_train = X[train_idx]
+#	y_train = y[train_idx]
+#	X_cv= X[cv_idx]
+#	y_cv = y[cv_idx]
 	
 	# Create stratified split for 1-time k-fold CV by phylum
 #	genome_idx_train = MemCache.genome_idx_train
@@ -204,10 +215,12 @@ def cv_dataloader(batch_size, num_features, k):
 #	y_cv = cv_set[:,num_features:]
 	
 	# Create dataloaders
-	train_ds = TensorDataset(X_train, y_train)
-	cv_ds = TensorDataset(X_cv, y_cv)
+#	train_ds = TensorDataset(X_train, y_train)
+#	cv_ds = TensorDataset(X_cv, y_cv)
+	train_ds = CachedDataset(train_idx)
+	cv_ds = CachedDataset(cv_idx)
 	# train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
-	train_dl = DataLoader(CachedDataset(), batch_size=batch_size, drop_last=False, shuffle=True)
+	train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
 	cv_dl = DataLoader(cv_ds, batch_size=batch_size, shuffle=True)
 	
 	return {"train": train_dl, "cv": cv_dl}
