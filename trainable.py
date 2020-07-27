@@ -56,11 +56,11 @@ class MemCache:
 
 #	train_data=np.loadtxt(DATA_FP+"mini_corrupted_train.txt")
 #	test_data=np.loadtxt(DATA_FP+"mini_corrupted_test.txt")
-	genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy',allow_pickle='TRUE').item()
+	genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
 	genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
 	genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
-	   
-	
+#	   
+#	
 	df, cluster_names = util.load_data(DATA_FP, "kegg")
 	genome_to_num ={}
 	for i,genome in enumerate(df.index):
@@ -320,7 +320,9 @@ class EarlyStopping(Stopper):
 		"""Return whether to stop and prevent trials from starting."""
 		return self.has_plateaued() and self._iterations >= self._patience
 
-
+def auto_garbage_collect(pct=80.0):
+    if psutil.virtual_memory().percent >= pct:
+        gc.collect()
 	
 def train_AE(config, reporter):
 		
@@ -352,7 +354,7 @@ def train_AE(config, reporter):
 	sys.stderr.flush()
 				
 	criterion = nn.BCELoss(reduction='sum')
-	loaders = cv_dataloader(config["batch_size"], num_features2, config["kfolds"])
+	loaders = cv_dataloader(int(config["batch_size"]), num_features2, config["kfolds"])
 
 	print("created dataloader")
 	sys.stdout.flush()
@@ -366,11 +368,9 @@ def train_AE(config, reporter):
 		# enumerate batches in epoch
 		for batch_idx, (data, target) in enumerate(loaders["train"]):
 			
-			# DELETE EVENTUALLY
-			#if batch_idx > 9: break
-			print("in epoch loop")
-			sys.stdout.flush()
-			sys.stderr.flush()
+			
+			if batch_idx > 2: break
+
 
 			data, target = data.to(device), target.to(device)
 			print("loaded data, target to device")
@@ -379,29 +379,13 @@ def train_AE(config, reporter):
 			
 			optimizer.zero_grad()
 			
-			print("ran zero_grad")
-			sys.stdout.flush()
-			sys.stderr.flush()
 			pred = model(data)
 			
-			print("ran pred")
-			sys.stdout.flush()
-			sys.stderr.flush()
 			loss = criterion(pred, target)
 			
-			print("calculated loss")
-			sys.stdout.flush()
-			sys.stderr.flush()
-
 			loss.backward()
-			print("BPT")
-			sys.stdout.flush()
-			sys.stderr.flush()			
-			
+
 			optimizer.step()
-			print("optimizer step")
-			sys.stdout.flush()
-			sys.stderr.flush()
 			
 			# SET T0 100 EVENTUALLY
 			if (batch_idx+1) % 100 == 1:
@@ -416,6 +400,9 @@ def train_AE(config, reporter):
 			print("end")
 			sys.stdout.flush()
 			sys.stderr.flush()
+			
+	auto_garbage_collect()		
+	
 #		torch.save(model.state_dict(), "./model.pt")
 #		torch.save(y_probas, "./y_probas.pt")	
 		
