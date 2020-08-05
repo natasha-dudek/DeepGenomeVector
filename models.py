@@ -15,12 +15,17 @@ class AutoEncoder(nn.Module):
 		self.nn_layers = nn_layers
 		self.layers = nn.ModuleList()
 		
+		width_custom = {1: [7065, 13], 2: [7065, 79, 13], 3: [7065, 79, 43, 13], 4: [7065, 79, 43, 37, 13]}
+		
 		width = [num_clusters]
 		# Encoder
 		in_num = num_clusters
 		for i in range(nn_layers):
-			out_num = math.ceil(math.log2(in_num))
-			
+					
+			#out_num = math.ceil(math.log2(in_num))
+			#if out_num < 13: out_num = 13
+			out_num = width_custom[nn_layers][i+1] 			
+					
 			self.layers.append(nn.Linear(in_num, out_num))
 			nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
 			in_num = out_num
@@ -28,8 +33,11 @@ class AutoEncoder(nn.Module):
 		
 		# Decoder
 		width = width[::-1]
+		width_custom[nn_layers] = width_custom[nn_layers][::-1]
 		for i in range(nn_layers):
-			out_num = width[i+1]
+			#out_num = width[i+1]
+			out_num = width_custom[nn_layers][i+1]
+			
 			# last layer should have exactly num_clusters features
 			# last layer has sigmoid activation, use Xavier instead of He
 			if i == (nn_layers - 1): 

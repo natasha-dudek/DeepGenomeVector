@@ -362,7 +362,7 @@ def my_roc_curve(target, y_probas):
 	
 	Arguments:
 	target (numpy.ndarray) -- uncorrupted version of genomes (n_genomes, n_features)
-	y_probas (numpy.ndarray) -- prediction for uncorrupted genomes (n_genomes, n_features)
+	y_probas (numpy.ndarray) -- prediction for corrupted genomes (n_genomes, n_features)
 	"""
 	
 	# ROC/AUC calculations
