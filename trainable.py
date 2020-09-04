@@ -43,52 +43,49 @@ sys.stderr = open('file_terr', 'w')
 class MemCache:
     ###########################
     # TO RUN ON CC:
-    DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
-    train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
-    test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
-    df_train_data = pd.DataFrame(train_data)
-
-    genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
-    genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
-    genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
-  
-    df, cluster_names = util.load_data(DATA_FP, "kegg")
-    genome_to_num ={}
-    for i,genome in enumerate(df.index):
-        genome_to_num[genome] = i
-    num_to_genome = {v: k for k, v in genome_to_num.items()}
-    
-    # To make predictions on (ROC + AUC)
-    num_features = int(train_data.shape[1]/2)
-    tensor_test_data = torch.tensor(test_data).float()
-    corrupt_test_data = tensor_test_data[:,:num_features]
-    target = tensor_test_data[:,num_features:].numpy() # no grad
-    
-    train_data = torch.Tensor(train_data)
-    test_data = torch.Tensor(test_data)
-
-#    # split X and y
-    X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-    y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+#    DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
+#    train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
+#    test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
+#    df_train_data = pd.DataFrame(train_data)
+#
+#    genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
+#    genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
+#    genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
+#  
+#    df, cluster_names = util.load_data(DATA_FP, "kegg")
+#    genome_to_num ={}
+#    for i,genome in enumerate(df.index):
+#        genome_to_num[genome] = i
+#    num_to_genome = {v: k for k, v in genome_to_num.items()}
+#    
+#    # To make predictions on (ROC + AUC)
+#    num_features = int(train_data.shape[1]/2)
+#    tensor_test_data = torch.tensor(test_data).float()
+#    corrupt_test_data = tensor_test_data[:,:num_features]
+#    target = tensor_test_data[:,num_features:].numpy() # no grad
+#    
+#    train_data = torch.Tensor(train_data)
+#    test_data = torch.Tensor(test_data)
+#
+##    # split X and y
+#    X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+#    y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
     
     ###########################
     # TO RUN ON LAPTOP
     
-#    DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
-#    train_data = torch.load(DATA_FP+"corrupted_train_07-17-20.pt")
-#    test_data = torch.load(DATA_FP+"corrupted_test_07-17-20.pt")
-#    df, cluster_names = util.load_data(DATA_FP, "kegg")
-#    # To make predictions on (ROC + AUC)
-#    num_features = int(train_data.shape[1]/2)
-#    tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
-#    corrupt_test_data = tensor_test_data[:,:num_features]
-#    target = tensor_test_data[:,num_features:].detach().numpy()
-#    
-#    print("loading genome_to_tax")
-#    genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy',allow_pickle='TRUE').item()
-#    genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
-#    genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
-#    df_train_data = pd.DataFrame(train_data.numpy())   
+    DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+    train_data = torch.load("/Users/natasha/Desktop/corrupted_train_mini.pt")
+    test_data = torch.load("/Users/natasha/Desktop/corrupted_test_mini.pt")
+    #df, cluster_names = util.load_data(DATA_FP, "kegg")
+    # To make predictions on (ROC + AUC)
+    num_features = int(train_data.shape[1]/2)
+    tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
+    corrupt_test_data = tensor_test_data[:,:num_features]
+    target = tensor_test_data[:,num_features:].detach().numpy()
+    
+    X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+    y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
         
 def binarize(pred_tensor, replacement_threshold):
     """
@@ -147,8 +144,8 @@ def cv_dataloader(batch_size, num_features, k):
     
     Returns:
     dict of DataLoaders -- train and cross-validation dataloaders
-    	dict["train"] -- training dataloader, batch_size = batch_size
-    	dict["cv"] -- cross-validation dataloader, batch_size = 1000 (hard-coded)
+        dict["train"] -- training dataloader, batch_size = batch_size
+        dict["cv"] -- cross-validation dataloader, batch_size = 1000 (hard-coded)
     """
     # load train data from memory (saves time and, more importantly, space)
     X = MemCache.X # corrupted genomes
@@ -205,16 +202,16 @@ def cv(model, loaders, criterion, replacement_threshold, device=torch.device("cp
     return loss.item(), f1      
 
 def roc_auc(model):
-	"""
-	Create probability predictions
-	
-	Arguments:
-	model -- pytorch model
-	Note: uses corrupted test_data from MemCache
-	
-	Returns:
-	y_probas -- predicted probabilities
-	"""
+    """
+    Create probability predictions
+    
+    Arguments:
+    model -- pytorch model
+    Note: uses corrupted test_data from MemCache
+    
+    Returns:
+    y_probas -- predicted probabilities
+    """
     model.eval()
     with torch.no_grad():
         y_probas = model(MemCache.corrupt_test_data)
@@ -222,12 +219,12 @@ def roc_auc(model):
     return y_probas
 
 class EarlyStopping(Stopper):
-	"""
-	Implements fancy early stopping for hyperparameter tuning
-	
-	Copy-pasted from a newer version of Ray Tune that isn't compatible with scientific computing package versions on Compute Canada
-	"""
-	
+    """
+    Implements fancy early stopping for hyperparameter tuning
+    
+    Copy-pasted from a newer version of Ray Tune that isn't compatible with scientific computing package versions on Compute Canada
+    """
+    
     def __init__(self, metric, std=0.001, top=10, mode="min", patience=0):
         """Create the EarlyStopping object.
         Stops the entire experiment when the metric has plateaued
@@ -300,9 +297,9 @@ class EarlyStopping(Stopper):
         return self.has_plateaued() and self._iterations >= self._patience
 
 def auto_garbage_collect(pct=80.0):
-	"""
-	If memory usage is high, call garbage collector
-	"""
+    """
+    If memory usage is high, call garbage collector
+    """
     if psutil.virtual_memory().percent >= pct:
         gc.collect()
     
@@ -312,11 +309,11 @@ def train_AE(config, reporter):
     
     Arguments:
     config (dict) -- contains parameter and hyperparameter settings for a given trial
-    	nn_layers -- number of layers in neural net
-    	weight_decay -- weight_decay
-    	batch_size - batch_size to use for training data loader
-    	kfolds -- number of folds for K-fold cross validation
-    	num_epochs -- number of epochs for which to train
+        nn_layers -- number of layers in neural net
+        weight_decay -- weight_decay
+        batch_size - batch_size to use for training data loader
+        kfolds -- number of folds for K-fold cross validation
+        num_epochs -- number of epochs for which to train
     reporter (progress_reporter) -- ray tune progress reporter
     
     Returns:
@@ -360,16 +357,16 @@ def train_AE(config, reporter):
                 test_loss, test_f1 = cv(model, loaders, criterion, config["replacement_threshold"], device)
                 y_probas = roc_auc(model)
                 reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss) #, auc_score=auc)    
-            	model.train()
-            	
-			sys.stdout.flush()
-			sys.stderr.flush()
-			            	
+                model.train()
+                
+            sys.stdout.flush()
+            sys.stderr.flush()
+                            
     # save results (will save to tune results dir)              
     torch.save(model.state_dict(), "./model.pt")
     torch.save(y_probas, "./y_probas.pt")    
-	# if memory usage is high, may be able to free up space by calling garbage collect
-	auto_garbage_collect()         
+    # if memory usage is high, may be able to free up space by calling garbage collect
+    auto_garbage_collect()         
         
         
         
