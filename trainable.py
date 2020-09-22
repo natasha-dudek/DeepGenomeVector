@@ -45,9 +45,9 @@ from genome_embeddings import models
 class MemCache:
 	###########################
 	# TO RUN ON CC:
-	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_22-09-2020/"
-	train_data=np.loadtxt(DATA_FP+"corrupted_train_09-09-20.txt")
-	test_data=np.loadtxt(DATA_FP+"corrupted_test_09-09-20.txt")
+	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/"
+	train_data=np.loadtxt(DATA_FP+"corrupted_train_2020-09-09.txt")
+	test_data=np.loadtxt(DATA_FP+"corrupted_test_2020-09-09.txt")
 	#df_train_data = pd.DataFrame(train_data)
 
 	#genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
