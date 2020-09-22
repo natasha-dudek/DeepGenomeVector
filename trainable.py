@@ -45,49 +45,49 @@ from genome_embeddings import models
 class MemCache:
 	###########################
 	# TO RUN ON CC:
-#	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_07-17-2020/"
-#	train_data=np.loadtxt(DATA_FP+"corrupted_train_07-17-20.txt")
-#	test_data=np.loadtxt(DATA_FP+"corrupted_test_07-17-20.txt")
-#	df_train_data = pd.DataFrame(train_data)
-#
-#	genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
-#	genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
-#	genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
-#  
+	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_22-09-2020/"
+	train_data=np.loadtxt(DATA_FP+"corrupted_train_09-09-20.txt")
+	test_data=np.loadtxt(DATA_FP+"corrupted_test_09-09-20.txt")
+	#df_train_data = pd.DataFrame(train_data)
+
+	#genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
+	#genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
+	#genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
+  
 #	df, cluster_names = util.load_data(DATA_FP, "kegg")
 #	genome_to_num ={}
 #	for i,genome in enumerate(df.index):
 #		genome_to_num[genome] = i
 #	num_to_genome = {v: k for k, v in genome_to_num.items()}
-#	
-#	# To make predictions on (ROC + AUC)
-#	num_features = int(train_data.shape[1]/2)
-#	tensor_test_data = torch.tensor(test_data).float()
-#	corrupt_test_data = tensor_test_data[:,:num_features]
-#	target = tensor_test_data[:,num_features:].numpy() # no grad
-#	
-#	train_data = torch.Tensor(train_data)
-#	test_data = torch.Tensor(test_data)
-#
-##	# split X and y
-#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+	
+	# To make predictions on (ROC + AUC)
+	num_features = int(train_data.shape[1]/2)
+	tensor_test_data = torch.tensor(test_data).float()
+	corrupt_test_data = tensor_test_data[:,:num_features]
+	target = tensor_test_data[:,num_features:].numpy() # no grad
+	
+	train_data = torch.Tensor(train_data)
+	test_data = torch.Tensor(test_data)
+
+#	# split X and y
+	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 	
 	###########################
 	# TO RUN ON LAPTOP
 	
-	DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
-	train_data = torch.load("/Users/natasha/Desktop/corrupted_train_mini.pt")
-	test_data = torch.load("/Users/natasha/Desktop/corrupted_test_mini.pt")
-	#df, cluster_names = util.load_data(DATA_FP, "kegg")
-	# To make predictions on (ROC + AUC)
-	num_features = int(train_data.shape[1]/2)
-	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
-	corrupt_test_data = tensor_test_data[:,:num_features]
-	target = tensor_test_data[:,num_features:].detach().numpy()
-	
-	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+#	DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
+#	train_data = torch.load("/Users/natasha/Desktop/corrupted_train_mini.pt")
+#	test_data = torch.load("/Users/natasha/Desktop/corrupted_test_mini.pt")
+#	#df, cluster_names = util.load_data(DATA_FP, "kegg")
+#	# To make predictions on (ROC + AUC)
+#	num_features = int(train_data.shape[1]/2)
+#	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
+#	corrupt_test_data = tensor_test_data[:,:num_features]
+#	target = tensor_test_data[:,num_features:].detach().numpy()
+#	
+#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 		
 def binarize(pred_tensor, replacement_threshold):
 	"""
@@ -324,17 +324,9 @@ def vae_loss(pred, target, mu, logvar):
 	"""
 
 	# Reading: https://vxlabs.com/2017/12/08/variational-autoencoder-in-pytorch-commented-and-annotated/#what-is-a-variational-autoencoder
-	
-#	if torch.isnan(max([pred.max(), target.max(), mu.max(), logvar.max()])):
-#		print("pred.max()",pred.max())
-#		print("target.max()",target.max())
-#		print("mu.max()",mu.max())
-#		print("logvar.max()",logvar.max())
-#		import ipdb; ipdb.set_trace()
-
 	# Binary cross entropy: how well do output + target agree
 	BCE = F.binary_cross_entropy(pred, target, reduction='sum')
-	print("logvar.max()", logvar.max(),"logvar.exp()",logvar.exp().max())
+	#print("logvar.max()", logvar.max(),"logvar.exp()",logvar.exp().max())
 	# how much does the learned distribution vary from the unit Gaussian
 	KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) * 10000
 	# Normalize KLD to prevent KLD from dominating loss
@@ -346,7 +338,7 @@ def vae_loss(pred, target, mu, logvar):
 #	KLD = torch.min(KLD, 1000000*torch.ones_like(KLD))
 #	BCE = torch.min(BCE, 1000000*torch.ones_like(BCE))
 	
-	print("loss", loss.max())
+	#print("loss", loss.max())
 	
 	return loss
 	
@@ -388,25 +380,17 @@ def train_AE(config, reporter):
 			
 		# enumerate batches in epoch
 		for batch_idx, (corrupt_data, target) in enumerate(loaders["train"]):
-		
-			print("epoch",epoch, "batch_idx",batch_idx)
 			corrupt_data, target = corrupt_data.to(device), target.to(device)
 			optimizer.zero_grad()
 			pred, mu, logvar = model.forward(corrupt_data)
-			#print("max pred", pred.max())
-			#print("max target", target.max())
-			
 			loss = vae_loss(pred, target, mu, logvar)
 			
-			if torch.isnan(loss.max()):
-				print("Loss IS A NANNNNN")
-			
-			#print("model.grad.max()", model.grad.max())
+#			if torch.isnan(loss.max()):
+#				print("Loss IS A NAN")
 					 
 			loss.backward()
 			torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
-			if torch.isnan(loss.max()):
-				print("Loss IS A NANNNNN")
+
 			optimizer.step()
 			
 			# Every 100 batches, take stock of how well things are going
