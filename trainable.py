@@ -46,8 +46,8 @@ class MemCache:
 	###########################
 	# TO RUN ON CC:
 	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/"
-	train_data=np.loadtxt(DATA_FP+"corrupted_train_2020-09-09.txt")
-	test_data=np.loadtxt(DATA_FP+"corrupted_test_2020-09-09.txt")
+	train_data=torch.load(DATA_FP+"corrupted_train_2020-09-09.pt")
+	test_data=torch.load(DATA_FP+"corrupted_test_2020-09-09.pt")
 	#df_train_data = pd.DataFrame(train_data)
 
 	#genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
@@ -62,12 +62,12 @@ class MemCache:
 	
 	# To make predictions on (ROC + AUC)
 	num_features = int(train_data.shape[1]/2)
-	tensor_test_data = torch.tensor(test_data).float()
-	corrupt_test_data = tensor_test_data[:,:num_features]
-	target = tensor_test_data[:,num_features:].numpy() # no grad
+	#tensor_test_data = torch.tensor(test_data).float()
+	corrupt_test_data = test_data[:,:num_features]
+	#target = test_data[:,num_features:].numpy() # no grad
 	
-	train_data = torch.Tensor(train_data)
-	test_data = torch.Tensor(test_data)
+#	train_data = torch.Tensor(train_data)
+#	test_data = torch.Tensor(test_data)
 
 #	# split X and y
 	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
