@@ -46,45 +46,26 @@ class MemCache:
 	###########################
 	# TO RUN ON CC:
 	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/"
-	train_data=torch.load(DATA_FP+"corrupted_train_2020-09-09.pt")
-	test_data=torch.load(DATA_FP+"corrupted_test_2020-09-09.pt")
-	#df_train_data = pd.DataFrame(train_data)
+	train_data=torch.load(DATA_FP+"corruptedv2_train_2020-09-30.pt")
+	test_data=torch.load(DATA_FP+"corruptedv2_test_2020-09-30.pt")
 
-	#genome_to_tax = np.load(DATA_FP+'genome_to_tax.npy', allow_pickle='TRUE').item()
-	#genome_idx_train = torch.load(DATA_FP+"genome_idx_train_07-17-20.pt")
-	#genome_idx_test = torch.load(DATA_FP+"genome_idx_test_07-17-20.pt")
-  
-#	df, cluster_names = util.load_data(DATA_FP, "kegg")
-#	genome_to_num ={}
-#	for i,genome in enumerate(df.index):
-#		genome_to_num[genome] = i
-#	num_to_genome = {v: k for k, v in genome_to_num.items()}
-	
 	# To make predictions on (ROC + AUC)
 	num_features = int(train_data.shape[1]/2)
-	#tensor_test_data = torch.tensor(test_data).float()
 	corrupt_test_data = test_data[:,:num_features]
-	#target = test_data[:,num_features:].numpy() # no grad
-	
-#	train_data = torch.Tensor(train_data)
-#	test_data = torch.Tensor(test_data)
 
-#	# split X and y
+	# split X and y
 	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
 	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 	
 	###########################
 	# TO RUN ON LAPTOP
 	
-#	DATA_FP = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/'
-#	train_data = torch.load("/Users/natasha/Desktop/corrupted_train_mini.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corrupted_test_mini.pt")
-#	#df, cluster_names = util.load_data(DATA_FP, "kegg")
+#	train_data = torch.load("/Users/natasha/Desktop/corruptedv2_train_2020-09-30.pt")
+#	test_data = torch.load("/Users/natasha/Desktop/corruptedv2_test_2020-09-30.pt")
+#
 #	# To make predictions on (ROC + AUC)
 #	num_features = int(train_data.shape[1]/2)
-#	tensor_test_data = torch.tensor([i.numpy() for i in test_data]).float()
-#	corrupt_test_data = tensor_test_data[:,:num_features]
-#	target = tensor_test_data[:,num_features:].detach().numpy()
+#	corrupt_test_data = test_data[:,:num_features]
 #	
 #	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
 #	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
