@@ -59,67 +59,6 @@ def load_data(path, data_source):
 		#data_viz.clusters_per_taxa(df)
 		
 	return df, cluster_names
-
-
-def corrupt(data, num_corruptions, corruption_fraction, cluster_names, mode, path):
-	#### USE THIS ONE IF DATA IS TENSOR (not tensor subset)
-	
-	"""
-	Stochastically drop KO's / modules from genomes
-	
-	Arguments:
-	data (df) -- train or test dataset
-	num_corruptions (int) -- number of corrupted outputs to produce per input genome
-	corruption_fraction (float) -- what % of KO's/mods to drop
-	
-	Returns:
-	out (tensor) -- training set with corrupted genomes and then uncorrupted genomes in each row
-	genome_idx (dict) -- maps genome idx in corrupt_train / corrupt_test to genome ID
-		E.g.: genome_idx[i] -> 'T012839'
-	"""
-
-	if mode != "train" and mode != "test":
-		raise ValueError ("mode must either be 'train' or 'test'")
-
-	data = torch.tensor(data.values) 
-
-	num_genomes = data.shape[0] # number of genomes in the train ds
-	out = np.zeros(shape=(num_genomes*num_corruptions,data.shape[1]*2))
-	
-	# Create dict that can trace each genome back to original genome index 
-	genome_idx = {}
-	genome_counter = 0
-	
-	# Iterate through original genomes ---> produce corrupt versions 
-	for s in range(num_genomes):
-		# get indices of KO's present 
-		ko_idx = np.argwhere(data[s] == 1).tolist()[0]
-		uncorr_idx = [(i + data.shape[1]) for i in ko_idx]
-		# generate num_corruptions corrupted genomes from original genome
-		for i in range(num_corruptions):
-			# random sampling of gene idxs without replacement
-			keeper_idx = random.sample(ko_idx, int(len(ko_idx)*corruption_fraction))
-			# retain only keeper genes
-			out[genome_counter][keeper_idx] = 1
-			# Then add uncorrupted genome
-			out[genome_counter][uncorr_idx] = 1
-			genome_idx[genome_counter] = s
-			genome_counter += 1
-	
-	out = torch.FloatTensor(out)
-	
-	if mode == "train":
-		torch.save(out, path+"corrupted_train_22-07-20.pt")
-		np.savetxt(path+"corrupted_train_07-17-20.txt", out.numpy())
-		torch.save(genome_idx, path+"genome_idx_train_22-07-20.pt")
-	else:
-		torch.save(out, path+"corrupted_test_22-07-20.pt")
-		np.savetxt(path+"corrupted_test_07-17-20.txt", out.numpy())
-		torch.save(genome_idx, path+"genome_idx_test_22-07-20.pt")
-			 
-	return out, genome_idx
-
-
 	
 def train_test_split(df, cluster_names, n_test, path, genome_to_num):#, batch_size, num_corruptions, corruption_fraction):
 	"""

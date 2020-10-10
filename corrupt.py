@@ -1,4 +1,5 @@
 import random
+import sys
 import numpy as np
 import torch
 
@@ -57,6 +58,32 @@ def heart_of_corruption_v2(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mo
 
     return corrupted
 
+def heart_of_corruption_v3(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean):
+    """
+    For each genome, remove  one KO from each module at random (convert bits to zeros) -- how well can VAE restore a single KO?
+    
+    Arguments:
+    org (str) -- tla for genome (e.g.: "aha")
+    n_max (int) -- the number of mods in a given genome
+    
+    Returns:
+    corrupted (np array) -- 
+    """
+    keeps = random.sample(list(org_to_mod_to_kos[org].keys()), (n_max-1))            
+    
+    idxs = []
+    for mod in org_to_mod_to_kos[org]:
+        keeps = random.sample(org_to_mod_to_kos[org][mod], (len(org_to_mod_to_kos[org][mod]) - 1))
+        for ko in keeps:
+            idxs.append(all_kos.index(ko))
+        
+    # create corrupted version of genome that only has those mods
+    corrupted = np.zeros(n_kos_tot)
+    for i in idxs:
+        corrupted[i] = 1
+
+    return corrupted
+
 
 
 def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean,  method):
@@ -97,21 +124,74 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
             while n_corrupted < n_corrupt: 
                 c_train_genomes.append(org)
                 #corrupted = heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos)
-                corrupted = heart_of_corruption_v2(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
-                
+                if method == "v1":
+                    corrupted = heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
+                elif method == "v2":
+                    corrupted = heart_of_corruption_v2(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
+                elif method == "v3":
+                    corrupted = heart_of_corruption_v3(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
                 genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
                 output.append(genome_out)
                 line_counter += 1
                 n_corrupted += 1
             
     return torch.Tensor(np.array(output)), c_train_genomes
-    
 
+def corrupt_orig(data, num_corruptions, corruption_fraction):	
+	"""
+	Stochastically drop KO's / modules from genomes
+	
+	Arguments:
+	data (df) -- train or test dataset
+	num_corruptions (int) -- number of corrupted outputs to produce per input genome
+	corruption_fraction (float) -- what % of KO's/mods to drop
+	
+	Returns:
+	out (tensor) -- training set with corrupted genomes and then uncorrupted genomes in each row
+	genome_idx (dict) -- maps genome idx in corrupt_train / corrupt_test to genome ID
+		E.g.: genome_idx[i] -> 'T012839'
+	"""
+	
+	num_genomes = data.shape[0] # number of genomes in the train ds
+	out = np.zeros(shape=(num_genomes*num_corruptions,data.shape[1]*2))
+	
+	# Create dict that can trace each genome back to original genome index 
+	genome_idx = {}
+	genome_counter = 0
+	
+	print
+	
+	# Iterate through original genomes ---> produce corrupt versions 
+	for s in range(num_genomes):
+		# get indices of KO's present 
+		ko_idx = np.argwhere(data[s] == 1).tolist() #[0]
+		ko_idx = [item for sublist in ko_idx for item in sublist]
 
+		uncorr_idx = [(i + data.shape[1]) for i in ko_idx]
 
-
-
-
+		# generate num_corruptions corrupted genomes from original genome
+		for i in range(num_corruptions):
+			# random sampling of gene idxs without replacement
+			keeper_idx = random.sample(ko_idx, int(len(ko_idx)*corruption_fraction))
+			# retain only keeper genes
+			out[genome_counter][keeper_idx] = 1
+			
+#			print(np.sum(out[genome_counter]))
+			if np.sum(out[genome_counter]) < 1: 
+				print("error", len(keeper_idx))
+				print("int(len(ko_idx)*corruption_fraction)",int(len(ko_idx)*corruption_fraction))
+				print("len(ko_idx)",len(ko_idx))
+				raise Exception()
+#				sys.exit(0)
+			
+			# Then add uncorrupted genome
+			out[genome_counter][uncorr_idx] = 1
+			genome_idx[genome_counter] = s
+			genome_counter += 1
+	
+	out = torch.FloatTensor(out)
+			 
+	return out, genome_idx
 
 
 
