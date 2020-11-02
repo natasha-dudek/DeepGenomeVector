@@ -31,8 +31,10 @@ class VariationalAutoEncoder(nn.Module):
 #                        4: [num_clusters, 79, 43, 37, self.code_size]}
 
         width_custom = {1: [num_clusters, self.code_size], 
-                        2: [num_clusters, 79, self.code_size], 
-                        3: [num_clusters, 500, 250, self.code_size], 
+                        2: [num_clusters, 79, self.code_size],
+                        3: [num_clusters, 500, 250, 100], 
+                        #3: [num_clusters, 500, 250, 100],
+                        #3: [num_clusters, 1300, 900, 500], 
                         4: [num_clusters, 79, 43, 37, self.code_size]}
 
         width = [num_clusters]
@@ -138,68 +140,191 @@ class VariationalAutoEncoder(nn.Module):
 
 class AutoEncoder(nn.Module):
 
-	def __init__(self, num_clusters, nn_layers):
-		super(AutoEncoder, self).__init__()
+    def __init__(self, num_clusters, nn_layers):
+        super(AutoEncoder, self).__init__()
 
-		# Useful reading:
-		# https://discuss.pytorch.org/t/how-to-create-mlp-model-with-arbitrary-number-of-hidden-layers/13124
-		# https://discuss.pytorch.org/t/when-should-i-use-nn-modulelist-and-when-should-i-use-nn-sequential/5463/12
-		# Weight init: https://www.deeplearningwizard.com/deep_learning/boosting_models_pytorch/weight_initialization_activation_functions/
-		self.nn_layers = nn_layers
-		self.layers = nn.ModuleList()
-		
-		#width_custom = {1: [7065, 13], 2: [7065, 79, 13], 3: [7065, 79, 43, 13], 4: [7065, 79, 43, 37, 13]}
-		#width_custom = {1: [9874, 13], 2: [9874, 79, 13], 3: [9874, 79, 43, 13], 4: [9874, 79, 43, 37, 13]}
-		width_custom = {1: [9874, 13], 2: [9874, 150, 100], 3: [9874, 500, 250, 100], 4: [9874, 79, 43, 37, 13]}
-
-
-		width = [num_clusters]
-		# Encoder
-		in_num = num_clusters
-		for i in range(nn_layers):
-
-			#out_num = math.ceil(math.log2(in_num))
-			#if out_num < 13: out_num = 13
-			out_num = width_custom[nn_layers][i+1] 			
-
-			self.layers.append(nn.Linear(in_num, out_num))
-			nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
-			in_num = out_num
-			width.append(in_num)
-
-		# Decoder
-		width = width[::-1]
-		width_custom[nn_layers] = width_custom[nn_layers][::-1]
-		for i in range(nn_layers):
-			#out_num = width[i+1]
-			out_num = width_custom[nn_layers][i+1]
-
-			# last layer should have exactly num_clusters features
-			# last layer has sigmoid activation, use Xavier instead of He
-			if i == (nn_layers - 1): 
-				self.layers.append(nn.Linear(in_num, num_clusters))
-				nn.init.xavier_normal_(self.layers[-1].weight)
-			else:
-				self.layers.append(nn.Linear(in_num, out_num))
-				nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
-			in_num = out_num
-
-	def forward(self, x): 
-
-		# apply leaky relu to all except last layer of nn
-		for i in range(len(self.layers) - 1):
-			x = F.leaky_relu(self.layers[i](x))
-		# Apply sigmoid to final output layer of decoder 
-		x = torch.sigmoid(self.layers[len(self.layers) - 1](x))
-
-		return x
-
-	def encode(self, x):
-		# Encode, apply leaky relu activation to all except code layer
-		for i in range(int(len(self.layers)/2) - 1):
-			x = F.leaky_relu(self.layers[i](x))
-		# Do not add non-linearity to code layer
-		x = self.layers[int(len(self.layers)/2) - 1](x)
-
-		return x 
+        # Useful reading:
+        # https://discuss.pytorch.org/t/how-to-create-mlp-model-with-arbitrary-number-of-hidden-layers/13124
+        # https://discuss.pytorch.org/t/when-should-i-use-nn-modulelist-and-when-should-i-use-nn-sequential/5463/12
+        # Weight init: https://www.deeplearningwizard.com/deep_learning/boosting_models_pytorch/weight_initialization_activation_functions/
+        self.nn_layers = nn_layers
+        self.layers = nn.ModuleList()
         
+        #width_custom = {1: [7065, 13], 2: [7065, 79, 13], 3: [7065, 79, 43, 13], 4: [7065, 79, 43, 37, 13]}
+        #width_custom = {1: [9874, 13], 2: [9874, 79, 13], 3: [9874, 79, 43, 13], 4: [9874, 79, 43, 37, 13]}
+        width_custom = {1: [9874, 13], 2: [9874, 150, 100], 3: [9874, 500, 250, 100], 4: [9874, 79, 43, 37, 13]}
+
+
+        width = [num_clusters]
+        # Encoder
+        in_num = num_clusters
+        for i in range(nn_layers):
+
+            #out_num = math.ceil(math.log2(in_num))
+            #if out_num < 13: out_num = 13
+            out_num = width_custom[nn_layers][i+1]             
+
+            self.layers.append(nn.Linear(in_num, out_num))
+            nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
+            in_num = out_num
+            width.append(in_num)
+
+        # Decoder
+        width = width[::-1]
+        width_custom[nn_layers] = width_custom[nn_layers][::-1]
+        for i in range(nn_layers):
+            #out_num = width[i+1]
+            out_num = width_custom[nn_layers][i+1]
+
+            # last layer should have exactly num_clusters features
+            # last layer has sigmoid activation, use Xavier instead of He
+            if i == (nn_layers - 1): 
+                self.layers.append(nn.Linear(in_num, num_clusters))
+                nn.init.xavier_normal_(self.layers[-1].weight)
+            else:
+                self.layers.append(nn.Linear(in_num, out_num))
+                nn.init.kaiming_normal_(self.layers[-1].weight) # Kaiming / He initialization
+            in_num = out_num
+
+    def forward(self, x): 
+
+        # apply leaky relu to all except last layer of nn
+        for i in range(len(self.layers) - 1):
+            x = F.leaky_relu(self.layers[i](x))
+        # Apply sigmoid to final output layer of decoder 
+        x = torch.sigmoid(self.layers[len(self.layers) - 1](x))
+
+        return x
+
+    def encode(self, x):
+        # Encode, apply leaky relu activation to all except code layer
+        for i in range(int(len(self.layers)/2) - 1):
+            x = F.leaky_relu(self.layers[i](x))
+        # Do not add non-linearity to code layer
+        x = self.layers[int(len(self.layers)/2) - 1](x)
+
+        return x 
+
+class Generator(nn.Module):
+    '''
+    Generator Class
+    Values:
+        z_dim: the dimension of the noise vector, a scalar
+        im_chan: the number of channels in the images, fitted for the dataset used, a scalar
+              (MNIST is black-and-white, so 1 channel is your default)
+        hidden_dim: the inner dimension, a scalar
+    '''    
+    
+    def __init__(self):
+        super(Generator, self).__init__()
+        
+        self.width_custom = [9874, 500, 250, 100]
+        self.n_features = 9874
+        
+        # Build the neural network
+        self.gen = nn.Sequential(
+            self.make_gen_block(self.n_features*6, self.n_features*4),
+            self.make_gen_block(self.n_features*4, self.n_features*2),
+            self.make_gen_block(self.n_features*2, self.n_features, final_layer=True),
+        )
+
+        def weights_init(m):
+            if isinstance(m, nn.Linear):
+                torch.nn.init.normal_(m.weight, 0.0, 0.02)
+            if isinstance(m, nn.BatchNorm2d):
+                torch.nn.init.normal_(m.weight, 0.0, 0.02)
+                torch.nn.init.constant_(m.bias, 0)
+            
+        self.gen = self.gen.apply(weights_init)            
+
+    def make_gen_block(self, input_channels, output_channels, final_layer=False):
+        '''
+        Function to return a sequence of operations corresponding to a generator block of DCGAN;
+        a transposed convolution, a batchnorm (except in the final layer), and an activation.
+        Parameters:
+            input_channels: how many channels the input feature representation has
+            output_channels: how many channels the output feature representation should have
+            final_layer: a boolean, true if it is the final layer and false otherwise 
+                      (affects activation and batchnorm)
+        '''
+        if not final_layer:
+            return nn.Sequential(
+                nn.Linear(input_channels, output_channels),
+                nn.BatchNorm2d(output_channels),
+                nn.LeakyReLU(inplace=True),
+            )
+        else:
+            return nn.Sequential(
+                nn.Linear(input_channels, output_channels),
+                nn.Sigmoid(),
+            )
+
+    def forward(self, noise):
+        '''
+        Function for completing a forward pass of the generator: Given a noise tensor,
+        returns generated images.
+        Parameters:
+            noise: a noise tensor with dimensions (n_samples, z_dim)
+        '''
+        return self.gen(noise)
+
+class Critic(nn.Module):
+    '''
+    Critic Class
+    Values:
+        im_chan: the number of channels in the images, fitted for the dataset used, a scalar
+              (MNIST is black-and-white, so 1 channel is your default)
+        hidden_dim: the inner dimension, a scalar
+    '''
+    def __init__(self, im_chan=1, hidden_dim=100):
+        super(Critic, self).__init__()
+        
+        self.width_custom = [9874, 500, 250, 100]
+        
+        self.crit = nn.Sequential(
+            self.make_crit_block(self.width_custom[0], self.width_custom[1]),
+            self.make_crit_block(self.width_custom[1], self.width_custom[2]),
+            self.make_crit_block(self.width_custom[3], 1, final_layer=True),
+        )
+        
+        def weights_init(m):
+            if isinstance(m, nn.Linear):
+                torch.nn.init.normal_(m.weight, 0.0, 0.02)
+            if isinstance(m, nn.BatchNorm2d):
+                torch.nn.init.normal_(m.weight, 0.0, 0.02)
+                torch.nn.init.constant_(m.bias, 0)
+            
+        self.crit = self.crit.apply(weights_init)
+
+    def make_crit_block(self, input_channels, output_channels, final_layer=False):
+        '''
+        Function to return a sequence of operations corresponding to a critic block of DCGAN;
+        a convolution, a batchnorm (except in the final layer), and an activation (except in the final layer).
+        Parameters:
+            input_channels: how many channels the input feature representation has
+            output_channels: how many channels the output feature representation should have
+            kernel_size: the size of each convolutional filter, equivalent to (kernel_size, kernel_size)
+            stride: the stride of the convolution
+            final_layer: a boolean, true if it is the final layer and false otherwise 
+                      (affects activation and batchnorm)
+        '''
+        if not final_layer:
+            return nn.Sequential(
+                nn.Linear(input_channels, output_channels),
+                nn.BatchNorm2d(output_channels),
+                nn.LeakyReLU(inplace=True),
+            )
+        else:
+            return nn.Sequential(
+                nn.Linear(input_channels, output_channels),
+            )
+
+    def forward(self, image):
+        '''
+        Function for completing a forward pass of the critic: Given an image tensor, 
+        returns a 1-dimension tensor representing fake/real.
+        Parameters:
+            image: a flattened image tensor with dimension (im_chan)
+        '''
+        crit_pred = self.crit(image)
+        return crit_pred 

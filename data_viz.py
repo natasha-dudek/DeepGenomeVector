@@ -8,6 +8,7 @@ import torch
 import math
 from collections import defaultdict
 from collections import OrderedDict
+from scipy import interp
 from sklearn.metrics import roc_curve, auc
 import random
 
@@ -368,20 +369,48 @@ def my_roc_curve(target, y_probas):
     fpr = dict()
     tpr = dict()
     roc_auc = dict()    
-    for i in range(target.shape[1]):
-        _, n = target.shape
-        print("num 1s",np.sum(target[:, i]))
-        print("num 0s",n - np.sum(target[:, i]))
-        print("sum 1s and 0s", n)
-        fpr[i], tpr[i],thresh = roc_curve(target[:, i], y_probas[:, i])
-        print("target[:, i]", np.isnan(np.max(target[:, i])))
-        print("y_probas[:, i]", np.isnan(np.max(y_probas[:, i])))
-#        print("thresh",thresh)
-        #print(fpr[i], tpr[i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
+    
+    n_genomes = target.shape[0]
+    n_genes = target.shape[1]
+    
+    # Calculate scores for each individual gene
+    for i in range(n_genes):
+        fpr[i], tpr[i], thresh = roc_curve(target[:, i], y_probas[:, i])
+        
+        if np.isnan(fpr[i]).any():
+            print("ERROR ON ROW i",i)
+            print("num 1s",np.sum(target[:, i]))
+            print("num 0s",n_genomes - np.sum(target[:, i]))
+            print("sum 1s and 0s", n_genomes)
+            print("target[:, i]", np.isnan(np.max(target[:, i])))
+            print("y_probas[:, i]", np.isnan(np.max(y_probas[:, i])))
+            continue
+        
+            roc_auc[i] = auc(fpr[i], tpr[i])
+    
+     # Calculate micro-average
+#    fpr["micro"], tpr["micro"], _ = roc_curve(target.ravel(), y_probas.ravel())
+#    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    fpr_micro, tpr_micro, _ = roc_curve(target.ravel(), y_probas.ravel())
+    roc_auc["micro"] = auc(fpr_micro, tpr_micro)
 
-    fpr["micro"], tpr["micro"], _ = roc_curve(target.ravel(), y_probas.ravel())
-    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+    
+    # THIS IS INCLUDING MICROAVERAGE IN MACROAVERAGE CALC
+    # Calculate macro-average
+    # First aggregate all false positive rates
+#    all_fpr = np.unique(np.concatenate([fpr[x] for x in range(target.shape[1]) if not np.isnan(fpr[x]).any()]))
+
+    # Then interpolate all ROC curves at this points
+#    mean_tpr = np.zeros_like(all_fpr)
+#    for i in range(target.shape[1]):
+#        if np.isnan(fpr[i]).any(): continue
+#        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+    # Finally average it and compute AUC
+#    mean_tpr /= target.shape[1]
+#    roc_auc["macro"] = auc(all_fpr, mean_tpr)
+
+    
     
     n_examples = 50 # will plot 50 example genes on ROC curve
     
@@ -397,15 +426,91 @@ def my_roc_curve(target, y_probas):
     for i in range(len(a)):
         plt.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5,
              lw=2) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
-    plt.plot(fpr["micro"], tpr["micro"], color='red', 
+    plt.plot(fpr_micro, tpr_micro, color='black', 
              lw=5, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
+#    plt.plot(all_fpr, mean_tpr, color='blue', 
+#             lw=5, label='Macro-average (AUC = %0.2f)' % roc_auc["macro"])             
     plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
+    ax.set_ylim([0,1])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC curves for micro-average + 50 randomly selected genes')
+    plt.title('ROC for 50 randomly selected genes + micro-average')
     plt.legend(loc="lower right")
     #plt.show()
     
     return fig
+
+def genome_heatmap2(corrupted_test, idx, model):
+    from matplotlib.colors import LinearSegmentedColormap
+    import sklearn as sk
+    #colours = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # R -> G -> B
+    colours = ['black', 'green', 'orange', 'yellow', 'white']
+    cmap_name = 'my_list'
+    
+    n_features = int(corrupted_test.shape[1]/2)
+    n_extension = 100*100 - n_features
+    
+    # Get corrupted version of genome
+    corrupted = corrupted_test[idx][:n_features].tolist()
+    corrupted.extend([4] * n_extension) # 100*100 - n_features
+    corrupted = np.reshape(corrupted, (100, 100))
+    cm = LinearSegmentedColormap.from_list(cmap_name, colours, N=len(colours))
+    # Get uncorrupted version of genome
+    uncorrupted = corrupted_test[idx][n_features:].tolist()
+    uncorrupted.extend([4] * n_extension) # 100*100 - n_features
+    uncorrupted = np.reshape(uncorrupted, (100, 100))  
+    
+    # Get predicted uncorrupted version of genome
+    corr_genome = corrupted_test[idx][:n_features]
+    true_genome = corrupted_test[idx][n_features:]
+    model.eval()
+    pred = model.forward(corr_genome)
+    pred = pred[0].tolist()
+    binary_pred = [1 if i > 0.5 else 0 for i in pred]
+    
+    print("Num on bits",int(sum(corr_genome)))
+    print("Original num on bits",int(sum(true_genome)))
+    print("Pred num on bits",int(sum(binary_pred)))
+    tn, fp, fn, tp = sk.metrics.confusion_matrix(true_genome, binary_pred).flatten()
+    print("tn",tn, "fp",fp, "fn",fn, "tp",tp)
+    print("F1", sk.metrics.f1_score(true_genome, binary_pred, zero_division=0))
+    
+    colour_pred = []
+    for i in zip(binary_pred, corr_genome, true_genome):
+        if i[0] == i[2] == 1: # TP
+            colour_pred.append(1) 
+        elif i[0] == i[2] == 0: # TN
+            colour_pred.append(0) 
+        elif i[0] == 0 and i[2] == 1: # False negative
+            colour_pred.append(2)
+        else: # False positive
+            colour_pred.append(3)
+            
+    print(len(colour_pred))
+    print("n_features",n_features,"len(colour_pred)",len(colour_pred),"n_extension",n_extension)
+    colour_pred.extend([4] * n_extension) # 100*100 - n_features
+    print(len(colour_pred))
+    colour_pred = np.reshape(colour_pred, (100, 100))  
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15,5))
+    ax1.imshow(uncorrupted, cmap=cm, interpolation='nearest')
+    ax2.imshow(corrupted, cmap=cm, interpolation='nearest')  
+    ax3.imshow(colour_pred, cmap=cm, interpolation='nearest')
+    ax1.set_title("Uncorrupt")
+    ax2.set_title("Corrupt")
+    ax3.set_title("Predicted")
+    return fig
+
+def kld_vs_bce(kld, bce):
+	x = [i for i in range(len(kld))]
+	kld = [int(i) for i in kld]
+	bce = [int(i) for i in bce]
+	plt.scatter(x,kld, c='b', marker='.', label='KLD')
+	plt.scatter(x,bce, c='r', marker='.', label='BCE')
+	plt.legend(loc='upper right')
+	plt.xlabel("Experience")
+	plt.ylabel("Loss")
+	plt.yscale('log')
+	#plt.savefig("/Users/natasha/Desktop/fig2.png")
+	#return fig
