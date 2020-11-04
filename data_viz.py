@@ -12,7 +12,7 @@ from scipy import interp
 from sklearn.metrics import roc_curve, auc
 import random
 
-def learning_curve(train_y, test_y, type_curve, cirriculum):
+def learning_curve(train_y, test_y, type_curve, cirriculum=False):
     """
     Plots a learning curve
     
@@ -77,6 +77,15 @@ def learning_curve(train_y, test_y, type_curve, cirriculum):
         
     return fig
     
+
+def gan_learning_curve(generator_losses, critic_losses):
+    plt.plot(range(len(critic_losses)),critic_losses,marker='o', c='b',label='Critic',fillstyle='none')
+    plt.plot(range(len(generator_losses)),generator_losses,marker='o', c='g',label='Generator',fillstyle='none')
+    plt.legend(loc=1)
+    
+    plt.title("WGAN-GP Learning Curve")
+    plt.ylabel("W-Loss")
+    plt.xlabel("Experience")
     
 def calc_svd(data):
     """
@@ -503,14 +512,14 @@ def genome_heatmap2(corrupted_test, idx, model):
     return fig
 
 def kld_vs_bce(kld, bce):
-	x = [i for i in range(len(kld))]
-	kld = [int(i) for i in kld]
-	bce = [int(i) for i in bce]
-	plt.scatter(x,kld, c='b', marker='.', label='KLD')
-	plt.scatter(x,bce, c='r', marker='.', label='BCE')
-	plt.legend(loc='upper right')
-	plt.xlabel("Experience")
-	plt.ylabel("Loss")
-	plt.yscale('log')
-	#plt.savefig("/Users/natasha/Desktop/fig2.png")
-	#return fig
+    x = [i for i in range(len(kld))]
+    kld = [int(i) for i in kld]
+    bce = [int(i) for i in bce]
+    plt.scatter(x,kld, c='b', marker='.', label='KLD')
+    plt.scatter(x,bce, c='r', marker='.', label='BCE')
+    plt.legend(loc='upper right')
+    plt.xlabel("Experience")
+    plt.ylabel("Loss")
+    plt.yscale('log')
+    #plt.savefig("/Users/natasha/Desktop/fig2.png")
+    #return fig

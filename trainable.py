@@ -41,21 +41,20 @@ from genome_embeddings import models
 #sys.stdout = open('file_tout', 'w')
 #sys.stderr = open('file_terr', 'w')
 
-#class MemCache:
+class MemCache:
 	###########################
 	# TO RUN ON CC:
-#	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_01-10-2020/"
-##	train_data=torch.load(DATA_FP+"corruptedv2_train_2020-09-30.pt")
-##	test_data=torch.load(DATA_FP+"corruptedv2_test_2020-09-30.pt")
-#	train_data=torch.load(DATA_FP+"corruptedv3_train_2020-10-01.pt")
-#	test_data=torch.load(DATA_FP+"corruptedv3_test_2020-10-01.pt")
-#	# To make predictions on (ROC + AUC)
-#	num_features = int(train_data.shape[1]/2)
-#	corrupt_test_data = test_data[:,:num_features]
-#
-#	# split X and y
-#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-11-2020/"
+	train_data=torch.load(DATA_FP+"corrupted_train_2020-10-16_10mods.pt")
+	test_data=torch.load(DATA_FP+"corrupted_test_2020-10-16_10mods.pt")
+	# To make predictions on (ROC + AUC)
+	num_features = int(train_data.shape[1]/2)
+
+	corrupt_test_data = test_data[:,:num_features]
+
+	# split X and y
+	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 	
 	###########################
 	# TO RUN ON LAPTOP
@@ -593,104 +592,213 @@ def get_noise(n_samples, z_dim, device='cpu'):
 	  device: the device type
 	'''
 	return torch.randn(n_samples, z_dim, device=device)	
+
+
+def get_gradient(crit, real, fake, epsilon):
+	'''
+	Return the gradient of the critic's scores with respect to mixes of real and fake images.
+	Parameters:
+		crit: the critic model
+		real: a batch of real genomes
+		fake: a batch of fake genomes
+		epsilon: a vector of the uniformly random proportions of real/fake per mixed image
+	Returns:
+		gradient: the gradient of the critic's scores, with respect to the mixed image
+	'''
+	# Mix the genomes together
+	mixed_images = real * epsilon + fake * (1 - epsilon)
+	# Calculate the critic's scores on the mixed genomes
+	mixed_scores = crit(mixed_images)
+
+	# Take the gradient of the scores with respect to the images
+	gradient = torch.autograd.grad(
+		inputs=mixed_images,
+		outputs=mixed_scores,
+		grad_outputs=torch.ones_like(mixed_scores), 
+		create_graph=True,
+		retain_graph=True,
+	)[0]
 	
-def train_single_gan(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, train_data, test_data):
+	return gradient
+
+def gradient_penalty(gradient):
+	'''
+	Towards 1-Lipschitz continuity enforcement, return the gradient penalty, given a gradient.
+	Given a batch of image gradients, you calculate the magnitude of each image's gradient
+	and penalize the mean quadratic distance of each magnitude to 1.
+	Parameters:
+		gradient: the gradient of the critic's scores, with respect to the mixed image
+	Returns:
+		penalty: the gradient penalty
+	'''
+	# Flatten the gradients so that each row captures one image
+	#gradient = gradient.view(len(gradient), -1)
+
+	# Calculate the magnitude of every row
+	gradient_norm = gradient.norm(2, dim=1)
+	
+	# Penalize the mean squared distance of the gradient norms from 1
+	penalty = torch.mean((gradient_norm - 1)**2)
+	return penalty
+
+def get_gen_loss(crit_fake_pred):
+	'''
+	Return the loss of a generator given the critic's scores of the generator's fake images.
+	Parameters:
+		crit_fake_pred: the critic's scores of the fake images
+	Returns:
+		gen_loss: a scalar loss value for the current batch of the generator
+	'''
+	gen_loss = -torch.mean(crit_fake_pred)
+	return gen_loss
+	
+def get_crit_loss(crit_fake_pred, crit_real_pred, gp, c_lambda):
+	'''
+	Return the loss of a critic given the critic's scores for fake and real images,
+	the gradient penalty, and gradient penalty weight.
+	Parameters:
+		crit_fake_pred: the critic's scores of the fake images
+		crit_real_pred: the critic's scores of the real images
+		gp: the unweighted gradient penalty
+		c_lambda: the current weight of the gradient penalty 
+	Returns:
+		crit_loss: a scalar for the critic's loss, accounting for the relevant factors
+	'''
+	crit_loss = - torch.mean(crit_real_pred) + torch.mean(crit_fake_pred) + c_lambda*gp
+	return crit_loss
+
+def train_GAN(config, reporter):
 	"""
 	Train autoencoder, save model and y_probas 
 	
 	Arguments:
 	config (dict) -- contains parameter and hyperparameter settings for a given trial
-		nn_layers -- number of layers in neural net
-		weight_decay -- weight_decay
-		batch_size - batch_size to use for training data loader
 		kfolds -- number of folds for K-fold cross validation
 		num_epochs -- number of epochs for which to train
+		nn_architecture (dict) -- diff architectures (all 3 layers)
+		crit_repeats
+		gen_repeats
+		c_lambda
+		lr 
+		beta1
+		beta2
+		weight_decay
 	reporter (progress_reporter) -- ray tune progress reporter
 	
 	Returns:
 	None
 	"""	
-	print("10:35")
-	generator_losses = []
-	critic_losses = []
-
-	device = torch.device("cpu") #"cuda" if use_cuda else "cpu")
-	num_features = int(train_data.shape[1]/2)
-	z_dim = num_features * 6
+	use_cuda = config.get("use_gpu") and torch.cuda.is_available()
+	device = torch.device("cuda" if use_cuda else "cpu")
 	
-	# get model instances, set to train mode
-	gen = models.Generator().to('cpu')
-	crit = models.Critic().to('cpu')
-	gen.train()
-	crit.train()
+	n_features = 9874
+	
+	# extract important variables from config
+	kfolds = config[kfolds]
+	num_epochs = config[num_epochs]
+	beta_1 = config[beta_1]
+	beta_2 = config[beta_2]
+	lr = config[lr]
+	crit_to_gen_repeats = config[crit_to_gen_repeats]
+	c_lambda = config[c_lambda] # the weight of the gradient penalty
+	weight_decay = config[weight_decay]
+	architecture = config[architecture]
+	batch_size = config[batch_size]
+	
+	#### variables to calc based on config input
+	# crit_to_gen_repeats = 0 ---> train critic more than generator
+	# crit_to_gen_repeats = 1 ---> train generator more than critic
+	# note: never does equal training
+	if crit_to_gen_repeats == 0:
+		crit_repeats = random.randint(1, 10) # num times to update critic per generator update
+		gen_repeats = 0
+	else:
+		crit_repeats = 0
+		gen_repeats = random.randint(1, 10)
+
+	if architecture == 1:
+		arch_gen = [10, 100, 1000, 9874]
+		arch_crit = [9874, 1000, 100, 1]
+	elif architecture == 2:
+		arch_gen = [100, 500, 1500, 9874]
+		arch_crit = [9874, 1500, 100, 1]	
+	else:
+		arch_gen = [1000, 4000, 7000, 9874]
+		arch_crit = [9874, 7000, 3500, 1]	
+
+	z_dim = arch_gen[0]
+	
+	# get dataloader
+	loaders = trainable.cv_dataloader(batch_size, n_features, kfolds)
+		
+	# create model instances
+	gen = models.Generator(arch_gen).to(device).train()
+	crit = models.Critic(arch_crit).to(device).train()
 	
 	# define optimizers
-	beta_1 = 0.5
-	beta_2 = 0.999
 	gen_opt = torch.optim.AdamW(gen.parameters(), lr=lr, betas=(beta_1, beta_2), weight_decay=weight_decay)
 	crit_opt = torch.optim.AdamW(crit.parameters(), lr=lr, betas=(beta_1, beta_2), weight_decay=weight_decay)
-
-	# Create data loader
-	loaders = cv_dataloader_SINGLE(batch_size, num_features, kfolds, train_data, test_data)
-			
+	
+	steps = 0
+	critic_losses = []
+	generator_losses = []
 	for epoch in range(num_epochs):
-		
-		# enumerate batches in epoch
 		for batch_idx, (_, real) in enumerate(loaders["train"]):
 			cur_batch_size = len(real)
-			real = real.to(device)		
-			
+			real = real.to(device)
+	
 			mean_iteration_critic_loss = 0
 			for _ in range(crit_repeats):
 				### Update critic ###
 				crit_opt.zero_grad()
-				fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+				fake_noise = trainable.get_noise(cur_batch_size, z_dim, device=device)
 				fake = gen(fake_noise)
 				crit_fake_pred = crit(fake.detach())
 				crit_real_pred = crit(real)
-		   
-				epsilon = torch.rand(len(real), 1, 1, 1, device=device, requires_grad=True)
-				gradient = get_gradient(crit, real, fake.detach(), epsilon)
-				gp = gradient_penalty(gradient)
-				crit_loss = get_crit_loss(crit_fake_pred, crit_real_pred, gp, c_lambda)				
-				# Keep track of the average critic loss in this batch
+				
+				# Calculate loss for this iteration
+				epsilon = torch.rand(len(real), 1, device=device, requires_grad=True)
+				gradient = trainable.get_gradient(crit, real, fake.detach(), epsilon)
+				gp = trainable.gradient_penalty(gradient)
+				crit_loss = trainable.get_crit_loss(crit_fake_pred, crit_real_pred, gp, c_lambda)
 				mean_iteration_critic_loss += crit_loss.item() / crit_repeats
+	
 				# Update gradients
 				crit_loss.backward(retain_graph=True)
 				# Update optimizer
 				crit_opt.step()
 				
-			critic_losses += [mean_iteration_critic_loss]			
+			critic_losses += [mean_iteration_critic_loss]
 			
-			### Update generator ###
-			gen_opt.zero_grad()
-			fake_noise_2 = get_noise(cur_batch_size, z_dim, device=device)
-			fake_2 = gen(fake_noise_2)
-			crit_fake_pred = crit(fake_2)			
-			
-			gen_loss = get_gen_loss(crit_fake_pred)
-			gen_loss.backward()			
-				
-			# Update the weights
-			gen_opt.step()
-
-			# Keep track of the average generator loss
-			generator_losses += [gen_loss.item()]			
-			
-			
-			if batch_idx % 100 == 0:
-				train_f1 = f1_score(pred, target, replacement_threshold)
-				test_loss, test_f1 = cv_vae(model, loaders, replacement_threshold)
-				train_losses.append(loss.item())
-				test_losses.append(test_loss.item())
-				train_f1s.append(train_f1)
-				test_f1s.append(test_f1)
-				print("epoch",epoch,"batch",batch_idx)
-				print("train_loss",loss.item(), "train_f1",train_f1, "test_loss",test_loss.item(), "test_f1",test_f1) #, auc_score=auc)	
-				model.train()
-								
-		# if memory usage is high, may be able to free up space by calling garbage collect
-		auto_garbage_collect()  
+			mean_iteration_gen_loss = 0
+			for _ in range(gen_repeats):
+				### Update generator ###
+				gen_opt.zero_grad()
+				fake_noise_2 = trainable.get_noise(cur_batch_size, z_dim, device=device)
+				fake_2 = gen(fake_noise_2)
+				crit_fake_pred = crit(fake_2)
 	
-	return generator_losses, critic_losses, train_f1s, test_f1s, model	
+				gen_loss = trainable.get_gen_loss(crit_fake_pred)
+				gen_loss.backward()
+				mean_iteration_gen_loss += gen_loss.item() / gen_repeats
+				# Update the weights
+				gen_opt.step()
+	
+			# Keep track of the average generator loss
+			generator_losses += [mean_iteration_gen_loss]
+			
+			steps += 1
+	
+			if batch_idx % 100 == 0:
+				print("epoch",epoch,"batch",batch_idx,"gen_loss",gen_loss.item(), 
+						 "mean_iteration_critic_loss",mean_iteration_critic_loss)
+
+			sys.stdout.flush()
+			sys.stderr.flush()
+							
+	# save results (will save to tune results dir)			  
+	torch.save(model.state_dict(), "./model.pt")
+	#torch.save(y_probas, "./y_probas.pt")	
+	# if memory usage is high, may be able to free up space by calling garbage collect
+	auto_garbage_collect()   
 	

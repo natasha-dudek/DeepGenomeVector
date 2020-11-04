@@ -215,23 +215,22 @@ class Generator(nn.Module):
         hidden_dim: the inner dimension, a scalar
     '''    
     
-    def __init__(self):
+    def __init__(self, width_custom):
         super(Generator, self).__init__()
         
-        self.width_custom = [9874, 500, 250, 100]
-        self.n_features = 9874
+        self.width_custom = width_custom
         
         # Build the neural network
         self.gen = nn.Sequential(
-            self.make_gen_block(self.n_features*6, self.n_features*4),
-            self.make_gen_block(self.n_features*4, self.n_features*2),
-            self.make_gen_block(self.n_features*2, self.n_features, final_layer=True),
+            self.make_gen_block(self.width_custom[0], self.width_custom[1]),
+            self.make_gen_block(self.width_custom[1], self.width_custom[2]),
+            self.make_gen_block(self.width_custom[2], self.width_custom[3], final_layer=True),
         )
 
         def weights_init(m):
             if isinstance(m, nn.Linear):
                 torch.nn.init.normal_(m.weight, 0.0, 0.02)
-            if isinstance(m, nn.BatchNorm2d):
+            if isinstance(m, nn.BatchNorm1d):
                 torch.nn.init.normal_(m.weight, 0.0, 0.02)
                 torch.nn.init.constant_(m.bias, 0)
             
@@ -250,8 +249,8 @@ class Generator(nn.Module):
         if not final_layer:
             return nn.Sequential(
                 nn.Linear(input_channels, output_channels),
-                nn.BatchNorm2d(output_channels),
-                nn.LeakyReLU(inplace=True),
+                nn.BatchNorm1d(output_channels),
+                nn.ReLU(inplace=True), # for stable gans: relu recommended in generator 
             )
         else:
             return nn.Sequential(
@@ -261,10 +260,13 @@ class Generator(nn.Module):
 
     def forward(self, noise):
         '''
-        Function for completing a forward pass of the generator: Given a noise tensor,
-        returns generated images.
-        Parameters:
-            noise: a noise tensor with dimensions (n_samples, z_dim)
+        Does a forward pass of the generator
+        
+        Arguments:
+        noise (tensor) -- a noise tensor with dimensions (n_samples, n_in) where n_in is the number of inputs to the generator
+        
+        Returns:
+        Forward pass of generator (tensor) -- dimensions (n_samples, n_out) where n_out is the number of outputs from the generator
         '''
         return self.gen(noise)
 
@@ -276,21 +278,21 @@ class Critic(nn.Module):
               (MNIST is black-and-white, so 1 channel is your default)
         hidden_dim: the inner dimension, a scalar
     '''
-    def __init__(self, im_chan=1, hidden_dim=100):
+    def __init__(self, width_custom):
         super(Critic, self).__init__()
         
-        self.width_custom = [9874, 500, 250, 100]
-        
+        self.width_custom = width_custom
+                 
         self.crit = nn.Sequential(
             self.make_crit_block(self.width_custom[0], self.width_custom[1]),
             self.make_crit_block(self.width_custom[1], self.width_custom[2]),
-            self.make_crit_block(self.width_custom[3], 1, final_layer=True),
+            self.make_crit_block(self.width_custom[2], self.width_custom[3], final_layer=True),
         )
         
         def weights_init(m):
             if isinstance(m, nn.Linear):
                 torch.nn.init.normal_(m.weight, 0.0, 0.02)
-            if isinstance(m, nn.BatchNorm2d):
+            if isinstance(m, nn.BatchNorm1d):
                 torch.nn.init.normal_(m.weight, 0.0, 0.02)
                 torch.nn.init.constant_(m.bias, 0)
             
@@ -311,20 +313,20 @@ class Critic(nn.Module):
         if not final_layer:
             return nn.Sequential(
                 nn.Linear(input_channels, output_channels),
-                nn.BatchNorm2d(output_channels),
-                nn.LeakyReLU(inplace=True),
+                nn.BatchNorm1d(output_channels),
+                nn.LeakyReLU(inplace=True), # for stable gans: leaky relu recommended in critic 
             )
         else:
             return nn.Sequential(
                 nn.Linear(input_channels, output_channels),
             )
 
-    def forward(self, image):
+    def forward(self, genome):
         '''
         Function for completing a forward pass of the critic: Given an image tensor, 
         returns a 1-dimension tensor representing fake/real.
         Parameters:
             image: a flattened image tensor with dimension (im_chan)
         '''
-        crit_pred = self.crit(image)
+        crit_pred = self.crit(genome)
         return crit_pred 
