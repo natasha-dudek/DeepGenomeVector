@@ -51,7 +51,7 @@ class VariationalAutoEncoder(nn.Module):
             in_num = out_num
             width.append(in_num)
 
-        # Add an additional fully connected layer 
+        # Add an additional fully connected layer -- need mu and logvar layers
         self.e_layers.append(nn.Linear(old_in_num, self.code_size))
         nn.init.kaiming_normal_(self.e_layers[-1].weight)
       

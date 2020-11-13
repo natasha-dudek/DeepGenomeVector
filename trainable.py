@@ -41,21 +41,21 @@ from genome_embeddings import models
 #sys.stdout = open('file_tout', 'w')
 #sys.stderr = open('file_terr', 'w')
 
-class MemCache:
-	###########################
-	# TO RUN ON CC:
-	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-11-2020/"
-	train_data=torch.load(DATA_FP+"corrupted_train_2020-10-16_10mods.pt")
-	test_data=torch.load(DATA_FP+"corrupted_test_2020-10-16_10mods.pt")
-	# To make predictions on (ROC + AUC)
-	num_features = int(train_data.shape[1]/2)
-
-	corrupt_test_data = test_data[:,:num_features]
-
-	# split X and y
-	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
-	
+#class MemCache:
+#	###########################
+#	# TO RUN ON CC:
+#	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-11-2020/"
+#	train_data=torch.load(DATA_FP+"corrupted_train_2020-10-16_10mods.pt")
+#	test_data=torch.load(DATA_FP+"corrupted_test_2020-10-16_10mods.pt")
+#	# To make predictions on (ROC + AUC)
+#	num_features = int(train_data.shape[1]/2)
+#
+#	corrupt_test_data = test_data[:,:num_features]
+#
+#	# split X and y
+#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+#	
 	###########################
 	# TO RUN ON LAPTOP
 	
@@ -489,6 +489,16 @@ def train_single_dae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 	#torch.save(y_probas, "./y_probas.pt")	
 	# if memory usage is high, may be able to free up space by calling garbage collect
 	auto_garbage_collect()				 
+
+
+def min_hamming_dist(pred, train_data):
+	
+	n_rows = train_data.shape[0]
+	n_col = train_data.shape[1]
+	pred_tensor = np.tile(pred, n_rows).reshape(n_rows,n_col)	
+	sklearn.metrics.hamming_loss(train_data, pred_tensor)
+
+	
 		
 		
 def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, train_data, test_data):
@@ -544,7 +554,11 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 			corrupt_data, target = corrupt_data.to(device), target.to(device)
 			optimizer.zero_grad()
 			pred, mu, logvar = model.forward(corrupt_data)
-			loss, KLD, BCE = vae_loss(pred, target, mu, logvar)
+			
+			closest_target = min_hamming_dist(pred)
+			loss, KLD, BCE = vae_loss(pred, closest_target, mu, logvar)
+			
+			#loss, KLD, BCE = vae_loss(pred, target, mu, logvar)
 			
 			kld0.append(KLD)
 			bce0.append(BCE)

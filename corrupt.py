@@ -15,7 +15,6 @@ def heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mo
     Returns:
     corrupted (np array) -- 
     """
-    #n_mods = random.randint(1, n_max) # going to select this many mods for corrupted genome
     n_mods = 10
     keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)            
     #print(org, keeps)
@@ -32,65 +31,7 @@ def heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mo
 
     return corrupted, keeps
 
-
-def heart_of_corruption_v2(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean):
-    """
-    For each genome, remove one KO per mod (convert bits to zeros) -- how well can VAE restore a single module?
-    
-    Arguments:
-    org (str) -- tla for genome (e.g.: "aha")
-    n_max (int) -- the number of mods in a given genome
-    
-    Returns:
-    corrupted (np array) -- 
-    """
-    keep_mods = list(org_to_mod_to_kos[org].keys())           
-
-    idxs = []
-    for mod in keep_mods:
-        # randomly pick one KO to eliminate
-        keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)
-    
-        for ko in org_to_mod_to_kos[org][mod]:
-        #for ko in mod_to_ko_clean[mod]:
-            idxs.append(all_kos.index(ko))
-
-    # create corrupted version of genome that only has those mods
-    corrupted = np.zeros(n_kos_tot)
-    for i in idxs:
-        corrupted[i] = 1
-
-    return corrupted, keeps
-
-def heart_of_corruption_v3(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean):
-    """
-    For each genome, remove  one KO from each module at random (convert bits to zeros) -- how well can VAE restore a single KO?
-    
-    Arguments:
-    org (str) -- tla for genome (e.g.: "aha")
-    n_max (int) -- the number of mods in a given genome
-    
-    Returns:
-    corrupted (np array) -- 
-    """
-    keeps = random.sample(list(org_to_mod_to_kos[org].keys()), (n_max-1))            
-    
-    idxs = []
-    for mod in org_to_mod_to_kos[org]:
-        keeps = random.sample(org_to_mod_to_kos[org][mod], (len(org_to_mod_to_kos[org][mod]) - 1))
-        for ko in keeps:
-            idxs.append(all_kos.index(ko))
-        
-    # create corrupted version of genome that only has those mods
-    corrupted = np.zeros(n_kos_tot)
-    for i in idxs:
-        corrupted[i] = 1
-
-    return corrupted, keeps
-
-
-
-def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean,  method):
+def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos):
     """
     For each genome, keep the KO's in 1-10 modules. Everything else should be zeros
     Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
@@ -124,18 +65,13 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
         n_max = min(n_tot_mods, 10) # which is smaller: the # mods or 10
         
         n_corrupted = 0
-        if n_tot_mods >= 10: 
+        if n_tot_mods >= 10 and len(org_to_kos[tnum]) > 500: # some genomes have mods annotated by no KOs annotated
             uncorrupted = train_data[i]
             while n_corrupted < n_corrupt: 
                 c_train_genomes.append(org)
                 #corrupted = heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos)
-                if method == "v1":
-                    corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
-                elif method == "v2":
-                    corrupted, in_mods = heart_of_corruption_v2(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
-                elif method == "v3":
-                    corrupted, in_mods = heart_of_corruption_v3(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
-             
+                corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_max, n_kos_tot, all_kos, mod_to_ko_clean)
+
                 genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
                 output.append(genome_out)
                 input_mods.append(in_mods)
