@@ -169,8 +169,8 @@ def train_test_split(keepers):
 	Arguments:
 	
 	Returns:
-	train_genomes (list) -- list of genomes for training set
-	test_genomes (list) -- list of genomes for test set
+		train_genomes (list) -- list of genomes for training set
+		test_genomes (list) -- list of genomes for test set
 	"""
 
 	### Create train-test split (ideally identical to former split)
@@ -195,19 +195,19 @@ def prep_data(list_genomes, all_kos, org_to_kos, mode):
     Creates a tensor for training / test data
     
     Arguments:
-    list_genomes (list) -- t_nums to be included in the tensor (i.e. train_genomes or test_genomes)
-    all_kos (list) -- all KOs that exist in the dataset
-    org_to_kos (dict) -- keys = t_nums, values = list of KOs encoded by genome
-    mode (str) -- used to save data to file ["test" | "train"] 
+	    list_genomes (list) -- t_nums to be included in the tensor (i.e. train_genomes or test_genomes)
+	    all_kos (list) -- all KOs that exist in the dataset
+	    org_to_kos (dict) -- keys = t_nums, values = list of KOs encoded by genome
+	    mode (str) -- used to save data to file ["test" | "train"] 
     
     Returns:
-    data (np array) -- rows = genomes, columns = KOs, 1 = KO present in genome, 0 = KO absent in genome
+	    data (np array) -- rows = genomes, columns = KOs, 1 = KO present in genome, 0 = KO absent in genome
     """
     
     assert (mode == "test" or mode == "train")
     
     data = np.zeros(shape=(len(list_genomes),len(all_kos)))
-
+		
     for i, t_num in enumerate(list_genomes): # org is something like 'T03060'
         for j, ko in enumerate(all_kos):
             if ko in org_to_kos[t_num]:
@@ -230,3 +230,18 @@ def clean_kos(mod_sets):
 	            max_path = ko_str.split("_")
 	    mod_to_ko_clean[mod] = max_path
 	return mod_to_ko_clean
+
+
+# Are input mods in the output?
+# input: test_input_mods
+# output: iterate through row, get idx on input mods, query whether they are present
+
+def create_mod_to_kos(org_to_mod_to_kos):
+	mod_to_kos = {}
+	for org in org_to_mod_to_kos:
+	    mods = org_to_mod_to_kos[org]
+	
+	    for mod in mods:
+	        if mod not in mod_to_kos:
+	            mod_to_kos[mod] = mods[mod]
+	return mod_to_kos

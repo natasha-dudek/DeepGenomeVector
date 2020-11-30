@@ -3,6 +3,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.manifold import TSNE
 import pandas as pd
 import numpy as np
+np.seterr(divide='ignore', invalid='ignore')
 import seaborn as sns
 import torch
 import math
@@ -12,7 +13,7 @@ from scipy import interp
 from sklearn.metrics import roc_curve, auc
 import random
 
-def learning_curve(train_y, test_y, type_curve, cirriculum=False):
+def learning_curve(train_losses, test_losses, train_f1s, test_f1s):
 	"""
 	Plots a learning curve
 	
@@ -24,57 +25,40 @@ def learning_curve(train_y, test_y, type_curve, cirriculum=False):
 	Returns:
 	nothing -- plots figure
 	"""
-	if len(train_y) != len(test_y):		
-		print("The number of training losses is not the same as the number of test losses")
-		
-		diff_len = len(train_y) - len(test_y)
-		
-		longer = "train"
-		if diff_len < 0:
-			longer = "test"
-		
-		print(("Dropping %s instances from the %sing set to make lengths equal") % (abs(diff_len), longer))
+	x_losses = [*range(len(train_losses))]
 	
-	x_losses = [*range(len(train_y))]
+	fig, axs = plt.subplots(2, figsize=(20, 10))
 	
-	if len(train_y) != len(test_y):
-		if longer == "train":
-			x_losses = x_losses[:len(test_y)]
-			train_y = train_y[:len(test_y)]
-		else:
-			x_losses = x_losses[:len(train_y)]
-			test_y = train_y[:len(train_y)]
-			
-	fig=plt.figure(figsize=(20, 7))
-	ax=fig.add_subplot()
-	ax.plot(x_losses,train_y,marker='o', c='b',label='Training',fillstyle='none')
-	ax.plot(x_losses,test_y,marker='o',c='g',label='CV',fillstyle='none')
+	axs[0].set_title("Optimization Learning Curve")
+	axs[1].set_title("Performance Learning Curve")
 	
-	plt.legend(loc=1)
+	axs[0].set_ylim(10**4,10**7)
+	axs[1].set_ylim(0,1)
 	
+	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=13)
+	axs[0].plot(x_losses, test_losses, marker='.', c='#33cc33', label='CV', markersize=13)
 	
-	if type_curve == "optimization":
-		plt.title("Optimization Learning Curve")
-		plt.ylabel("Loss")
-		plt.xlabel("Experience")
-		plt.yscale('log')
-	elif type_curve == "performance":
-		plt.title("Performance Learning Curve")
-		plt.ylabel("F1 score")
-		plt.xlabel("Experience")
-	else:
-		plt.title(type_curve+" Learning Curve")
-		plt.xlabel("Experience (batches)")
+	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=13)
+	axs[1].plot(x_losses, test_f1s, marker='.', c='#33cc33', label='CV', markersize=13)
 	
-	if cirriculum:
-		switch =  int(len(x_losses) / 3)
-		x1 = switch - 1
-		x2 = switch
-		x3 = 2*switch -1
-		x4 = 2*switch 
-		ax.axvspan(x1, x2, alpha=0.5, color='black')
-		ax.axvspan(x3, x4, alpha=0.5, color='black')
-		
+	axs[0].set_xlim(0,x_losses[-1]+1)
+	axs[1].set_xlim(0,x_losses[-1]+1)
+	
+	axs[0].set_ylabel('Loss (KLD + BCE)')
+	axs[0].semilogy()
+	axs[1].set_ylabel('F1 score')
+	
+	#axs[0].set_xlabel('Experience')
+	axs[1].set_xlabel('Experience')
+	
+	axs[1].axhline(y=max(test_f1s), color='r', dashes=(1,1))
+	print("max F1 score", max(test_f1s))
+	
+	axs[0].legend(loc="upper right")
+	#axs[1].legend(loc="lower right")
+	
+	plt.tight_layout()
+	
 	return fig
 	
 
@@ -152,7 +136,7 @@ def plot_tSNE(embeddings, test_data, num_to_genome, genome_to_tax, test_tax_dict
 	Plots tSNE in 2D
 	
 	Arguments: 
-	embedding -- embeddings, expecting torch tensor
+	embedding (tensor) -- embeddings
 	data -- expecting torch.utils.data.dataset.Subset created by pytorch's get_splits function
 	
 	Returns:
@@ -455,22 +439,24 @@ def my_roc_curve(target, y_probas):
 def genome_heatmap2(corrupted_test, idx, model):
 	from matplotlib.colors import LinearSegmentedColormap
 	import sklearn as sk
-	#colours = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # R -> G -> B
 	colours = ['black', 'green', 'orange', 'yellow', 'white']
 	cmap_name = 'my_list'
 	
 	n_features = int(corrupted_test.shape[1]/2)
-	n_extension = 100*100 - n_features
+	# set up dimensions of pixel rectangle
+	n_extension = 100*99 - n_features
+	n_rows = 99
+	n_cols = 100
 	
 	# Get corrupted version of genome
 	corrupted = corrupted_test[idx][:n_features].tolist()
 	corrupted.extend([4] * n_extension) # 100*100 - n_features
-	corrupted = np.reshape(corrupted, (100, 100))
+	corrupted = np.reshape(corrupted, (n_rows, n_cols))
 	cm = LinearSegmentedColormap.from_list(cmap_name, colours, N=len(colours))
 	# Get uncorrupted version of genome
 	uncorrupted = corrupted_test[idx][n_features:].tolist()
 	uncorrupted.extend([4] * n_extension) # 100*100 - n_features
-	uncorrupted = np.reshape(uncorrupted, (100, 100))  
+	uncorrupted = np.reshape(uncorrupted, (n_rows, n_cols))  
 	
 	# Get predicted uncorrupted version of genome
 	corr_genome = corrupted_test[idx][:n_features]
@@ -502,7 +488,7 @@ def genome_heatmap2(corrupted_test, idx, model):
 	print("n_features",n_features,"len(colour_pred)",len(colour_pred),"n_extension",n_extension)
 	colour_pred.extend([4] * n_extension) # 100*100 - n_features
 	print(len(colour_pred))
-	colour_pred = np.reshape(colour_pred, (100, 100))  
+	colour_pred = np.reshape(colour_pred, (n_rows, n_cols))  
 	fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15,5))
 	ax1.imshow(uncorrupted, cmap=cm, interpolation='nearest')
 	ax2.imshow(corrupted, cmap=cm, interpolation='nearest')  
@@ -510,6 +496,12 @@ def genome_heatmap2(corrupted_test, idx, model):
 	ax1.set_title("Uncorrupt")
 	ax2.set_title("Corrupt")
 	ax3.set_title("Predicted")
+	
+	# turn off tick labels and markers
+	for i in (ax1, ax2, ax3):
+		i.set_xticks([])
+		i.set_yticks([])
+	
 	return fig
 
 def kld_vs_bce(kld, bce):
@@ -526,7 +518,7 @@ def kld_vs_bce(kld, bce):
 	#return fig
 
 
-def tax_distribution(c_train_genomes, c_test_genomes, taxid_to_tla):
+def tax_distribution(c_train_genomes, c_test_genomes):
 	master_file = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/downloaded_3LA.txt").readlines()
 	master_file = map(str.strip, master_file)
 	
@@ -572,12 +564,12 @@ def tax_distribution(c_train_genomes, c_test_genomes, taxid_to_tla):
 	
 	return train_tax_dict, test_tax_dict
 
-def plot_tax_dist(c_train_genomes, c_test_genomes, taxid_to_tla):
+def plot_tax_dist(c_train_genomes, c_test_genomes):
 
 	n_train = str(int(len(c_train_genomes)/100))
 	n_test = str(int(len(c_test_genomes)/100))
 	
-	train_tax_dict, test_tax_dict = tax_distribution(c_train_genomes, c_test_genomes, taxid_to_tla)
+	train_tax_dict, test_tax_dict = tax_distribution(c_train_genomes, c_test_genomes)
 	
 	def phyla(tax_dict):
 		dist = []
@@ -628,7 +620,130 @@ def plot_tax_dist(c_train_genomes, c_test_genomes, taxid_to_tla):
 	    out = out+str(i)+": "+lab+", "
 	out
 	
-	return fig, out
+	return fig, out, y3
+
+
+
+
+
+def yucko_genome_heatmap2(corrupted_test, idx, model, all_kos):
+	from matplotlib.colors import LinearSegmentedColormap
+	import sklearn as sk
+	
+	n_features = int(corrupted_test.shape[1]/2)
+	
+	mod_to_kos = {}
+	for org in org_to_mod_to_kos:
+	    mods = org_to_mod_to_kos[org]
+	    
+	    for mod in mods:
+	        if mod not in mod_to_kos:
+	            mod_to_kos[mod] = mods[mod]
+	
+	process_to_mod = {}
+	path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/kegg_modules.txt"
+	file = open(path).readlines()
+	file = list(map(str.strip, file))
+	
+	type_proc = ""
+	for s in file:
+	    if s[0] == "B" and len(s) > 5:
+	        type_proc = s.split(">")[1].split("<")[0]
+	    
+	    elif s[0] == "D": 
+	        mod = s.split()[1]
+	        if type_proc in process_to_mod:
+	            process_to_mod[type_proc].append(mod)
+	        else:
+	            process_to_mod[type_proc] = [mod]
+	
+	proc_to_ko_idx = {}
+	for proc in process_to_mod:
+	    for mod in process_to_mod[proc]:
+	        if mod in mod_to_kos:
+	            kos = mod_to_kos[mod]
+	            idxs = []
+	            for ko in kos:
+	                idx = all_kos.index(ko)
+	                idxs.append(idx)
+	            if proc in proc_to_ko_idx:
+	                proc_to_ko_idx[proc].extend(idxs)
+	            else:
+	                proc_to_ko_idx[proc] = idxs
+
+	procs = proc_to_ko_idx.keys()
+	
+	idx_order = []
+	for proc in procs:
+	    idx_order.extend(proc_to_ko_idx[proc])
+	idx_order = list(set(idx_order))
+	
+	for i in range(n_features):
+	    if i not in idx_order:
+	        idx_order.append(i)
+	
+	idx = 1
+	n_extension = 100*100 - n_features
+	# get corrupted genomes
+	corrupted_genome = corrupted_test[idx, :n_features]
+	corrupted = torch.reshape(corrupted_genome, (1, n_features))
+	corrupted = corrupted[:,idx_order].tolist()[0]
+	corrupted.extend([4] * n_extension) # 100*100 - n_features
+	corrupted = np.reshape(corrupted, (100, 100))  
+	
+	# Get uncorrupted version of genome
+	uncorrupted_genome = corrupted_test[idx, n_features:]
+	uncorrupted = torch.reshape(uncorrupted_genome, (1, n_features))
+	uncorrupted = uncorrupted[:,idx_order].tolist()[0]
+	uncorrupted.extend([4] * n_extension) # 100*100 - n_features
+	uncorrupted = np.reshape(uncorrupted, (100, 100))  
+	
+	# Get predicted uncorrupted version of genome
+	model.eval()
+	pred = model.forward(corrupted_genome)
+	pred = pred[0].tolist()
+	binary_pred = [1 if i > 0.5 else 0 for i in pred]
+	
+	colours = ['black', 'green', 'orange', 'yellow', 'white']
+	cmap_name = 'my_list'
+	
+	n_features = int(corrupted_test.shape[1]/2)
+	n_extension = 100*100 - n_features
+	cm = LinearSegmentedColormap.from_list(cmap_name, colours, N=len(colours))
+	
+	colour_pred = []
+	for i in zip(binary_pred, corrupted_genome, uncorrupted_genome):
+	    if i[0] == i[2] == 1: # TP
+	        colour_pred.append(1) 
+	    elif i[0] == i[2] == 0: # TN
+	        colour_pred.append(0) 
+	    elif i[0] == 0 and i[2] == 1: # False negative
+	        colour_pred.append(2)
+	    else: # False positive
+	        colour_pred.append(3)
+	
+	print(len(colour_pred))
+	print("n_features",n_features,"len(colour_pred)",len(colour_pred),"n_extension",n_extension)
+	colour_pred.extend([4] * n_extension) # 100*100 - n_features
+	print(len(colour_pred))
+	colour_pred = np.reshape(colour_pred, (100, 100))  
+	fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15,5))
+	ax1.imshow(uncorrupted, cmap=cm, interpolation='nearest')
+	ax2.imshow(corrupted, cmap=cm, interpolation='nearest')  
+	ax3.imshow(colour_pred, cmap=cm, interpolation='nearest')
+	ax1.set_title("Uncorrupt")
+	ax2.set_title("Corrupt")
+	ax3.set_title("Predicted")
+
+	return fig
+
+
+
+
+
+
+
+
 
 
 

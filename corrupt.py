@@ -65,7 +65,7 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
         n_max = min(n_tot_mods, 10) # which is smaller: the # mods or 10
         
         n_corrupted = 0
-        if n_tot_mods >= 10 and len(org_to_kos[tnum]) > 500: # some genomes have mods annotated by no KOs annotated
+        if n_tot_mods >= 10 and len(org_to_kos[tnum]) >= 500: # some genomes have mods annotated by no KOs annotated
             uncorrupted = train_data[i]
             while n_corrupted < n_corrupt: 
                 c_train_genomes.append(org)

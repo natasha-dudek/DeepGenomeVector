@@ -555,10 +555,7 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 			optimizer.zero_grad()
 			pred, mu, logvar = model.forward(corrupt_data)
 			
-			closest_target = min_hamming_dist(pred)
-			loss, KLD, BCE = vae_loss(pred, closest_target, mu, logvar)
-			
-			#loss, KLD, BCE = vae_loss(pred, target, mu, logvar)
+			loss, KLD, BCE = vae_loss(pred, target, mu, logvar)
 			
 			kld0.append(KLD)
 			bce0.append(BCE)

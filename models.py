@@ -115,9 +115,13 @@ class VariationalAutoEncoder(nn.Module):
         
         if self.nn_layers > 1:
             for i in range(len(self.d_layers) - 1):
+                
+                if i == 0:
+                    zx = self.d_layers[i](x)
+                
                 x = F.leaky_relu(self.d_layers[i](x))
                        
-        return torch.sigmoid(self.d_layers[-1](x))
+        return torch.sigmoid(self.d_layers[-1](x)), zx
         
     def forward(self, x): 
         """
@@ -134,9 +138,9 @@ class VariationalAutoEncoder(nn.Module):
         
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        x = self.decode(z)  
+        x, zx = self.decode(z)  
         
-        return x, mu, logvar
+        return x, mu, logvar, zx
 
 class AutoEncoder(nn.Module):
 
