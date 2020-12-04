@@ -245,3 +245,17 @@ def create_mod_to_kos(org_to_mod_to_kos):
 	        if mod not in mod_to_kos:
 	            mod_to_kos[mod] = mods[mod]
 	return mod_to_kos
+	
+def remove_duds(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos):
+	# remove genomes encoding < 10 modules
+	keep_idx = []
+	for i in range(train_data.shape[0]):
+	    tnum = train_genomes[i]
+	    org = tnum_to_tla[tnum]
+	    if len(org_to_mod_to_kos[org]) >= 10:
+	        keep_idx.append(i)
+	train_data = train_data[keep_idx,:]
+	train_genomes = list(np.array(train_genomes)[keep_idx])
+	
+	return train_data, train_genomes
+	

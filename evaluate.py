@@ -378,18 +378,13 @@ def f1s_per_phylum(train_tax_dict, test_tax_dict, c_test_genomes, f1s):
 
 def plot_f1_per_phylum(test_phyla):
 	
-	
 	mad = []
 	median = []
 	phylum_list = []
-	for i in out:
-		mad.append(stats.median_absolute_deviation(out[i]))
+	for i in test_phyla:
+		mad.append(stats.median_absolute_deviation(test_phyla[i]))
 		median.append(np.median(test_phyla[i]))
 		phylum_list.append(i for i in test_phyla)
-	
-#	mad = [stats.median_absolute_deviation(test_phyla[i]) for i in test_phyla]
-#	median = [np.median(test_phyla[i]) for i in test_phyla]
-#	phylum_list = [i for i in test_phyla]
 	
 	median, mad, phylum_list = zip(*sorted(zip(median, mad, phylum_list), reverse=True))
 	phylum_num = [i for i in range(len(phylum_list))]
@@ -546,18 +541,15 @@ def plot_mod_count_vs_f1_v2(test_input_mods, f1s, train_out):
 	# For each mod, for each time it occurs in a genome, append F1 score of genome reconstruction
 	out = defaultdict(lambda: [])
 	for idx,i in enumerate(test_input_mods):
-		corruption_f1 = f1s[idx]
-		for mod in i:
-			out[mod].append(corruption_f1)
+	    corruption_f1 = f1s[idx]
+	    for mod in i:
+	        out[mod].append(corruption_f1)
 	
 	mod_f1s = []
 	mod_count = []
 	for i in out:
-		mod_f1s.append(np.median(out[i]))
-		mod_count.append(train_out[mod])
-
-#	mod_f1s = [np.median(out[i]) for i in out]
-#	mod_count = [train_out[mod] for mod in out]
+	    mod_f1s.append(np.median(out[i]))
+	    mod_count.append(len(out[i]))     
 	
 	fig = fig, ax = plt.subplots() 
 	plt.scatter(mod_count, mod_f1s)
@@ -793,16 +785,55 @@ def plot_metab_pathway_f1_v2(process_to_mod, mod_to_kos, all_kos, ko_f1s, figsiz
 	
 	return fig
 
-def new_genome_random(mod_to_kos, model, all_kos, save_to):
+
+def plot_metab_pathway_f1_v2_horizontal(process_to_mod, mod_to_kos, all_kos, ko_f1s, figsize):
+	proc_to_ko_F1s = defaultdict(list)
+	for proc in process_to_mod:
+	    for mod in process_to_mod[proc]:
+	        try:
+	            kos = mod_to_kos[mod]
+	            for ko in kos:
+	                idx = all_kos.index(ko)
+	                f1 = ko_f1s[idx]
+	                proc_to_ko_F1s[proc].append(f1)
+	        except KeyError: pass
+	list_f1s = []
+	list_procs = []
+	list_medians = []
+	
+	for key in proc_to_ko_F1s:
+	    list_f1s.append(proc_to_ko_F1s[key])
+	    list_procs.append(key)
+	    list_medians.append(np.median(proc_to_ko_F1s[key]))
+	    
+	list_medians, list_f1s, list_procs = zip(*sorted(zip(list_medians, list_f1s, list_procs), reverse=False))
+	
+	fig = plt.figure(figsize=figsize)
+	ax = fig.add_axes([0,0,1,1])
+	
+	for i, proc in enumerate(list_procs):
+	    # add scatter on x-axis
+	    y = np.random.normal(i+1, 0.04, size=len(list_f1s[i]))
+	    plt.plot(list_f1s[i], y, 'r.', alpha=0.2)
+	    
+	bp = ax.boxplot(list_f1s, showfliers=False, vert=False)
+	
+	plt.yticks([i+1 for i in range(len(list_procs))], [proc for proc in list_procs], rotation=0)
+	plt.xlabel('F1 score')
+	
+	return fig
+
+
+def new_genome_random(mod_to_kos, model, all_kos, save_to, BASE_DIR):
 	
 	# save_to = '/Users/natasha/Desktop/prot_out.txt'
 	
 	import pickle
 	
-	with open('/Users/natasha/Desktop/seq_dict.pkl', 'rb') as handle:
+	with open(BASE_DIR+'seq_dict.pkl', 'rb') as handle:
 	    seq_dict = pickle.load(handle)
 	
-	my_corrupted = torch.zeros((9874))
+	my_corrupted = torch.zeros(len(all_kos))
 	
 	# Pick 10 random modules as input
 	n_mods = 10
