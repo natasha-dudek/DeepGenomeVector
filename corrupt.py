@@ -136,11 +136,11 @@ def corrupt_orig(data, num_corruptions, corruption_fraction):
 
 
 
-def get_n_corrupt(tnum_to_tla, train_genomes):
+def get_n_corrupt(tnum_to_tla, train_genomes, mode):
     from genome_embeddings import data_viz
     train_genomes_tla = [tnum_to_tla[i] for i in train_genomes]
     
-    pc_train_tax_dict, _ = data_viz.tax_distribution(train_genomes_tla, train_genomes_tla)
+    pc_train_tax_dict, _ = data_viz.tax_distribution(train_genomes_tla, train_genomes_tla, mode)
     
     phylum_count = defaultdict(int)
     for tla in pc_train_tax_dict:
@@ -148,7 +148,7 @@ def get_n_corrupt(tnum_to_tla, train_genomes):
         if phylum == "Proteobacteria":
             phylum = pc_train_tax_dict[tla][2]
         
-    phylum_count[phylum] += 1
+        phylum_count[phylum] += 1
     
     for tla in train_genomes_tla:
         phylum = pc_train_tax_dict[tla][1]
@@ -157,8 +157,8 @@ def get_n_corrupt(tnum_to_tla, train_genomes):
             
         count = phylum_count[phylum]
         
-        #count_to_corrupt = {10: 5000, 100: 1000, 1000: 500, 10000: 100}
-        count_to_corrupt = {10: 50, 100: 10, 1000: 5, 10000: 1}
+        count_to_corrupt = {10: 5000, 100: 1000, 1000: 500, 10000: 100}
+        #count_to_corrupt = {10: 50, 100: 10, 1000: 5, 10000: 1}
         
         if count < 10:
             n_corrupt = count_to_corrupt[10]
@@ -172,7 +172,7 @@ def get_n_corrupt(tnum_to_tla, train_genomes):
     return n_corrupt
 
 
-def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos):
+def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, mode):
     """
     For each genome, keep the KO's in 1-10 modules. Everything else should be zeros
     Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
@@ -202,7 +202,7 @@ def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos,
         org = tnum_to_tla[tnum]
         n_tot_mods = len(org_to_mod_to_kos[org]) # number of modules in the genome 
         
-        n_corrupt = get_n_corrupt(tnum_to_tla, train_genomes) # get number of corruptions to make per genome
+        n_corrupt = get_n_corrupt(tnum_to_tla, train_genomes, mode) # get number of corruptions to make per genome
         n_corrupted = 0 # track how many have already been made
         
         uncorrupted = train_data[i]

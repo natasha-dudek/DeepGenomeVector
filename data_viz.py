@@ -518,14 +518,21 @@ def kld_vs_bce(kld, bce):
 	#return fig
 
 
-def tax_distribution(c_train_genomes, c_test_genomes):
-	master_file = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/downloaded_3LA.txt").readlines()
+def tax_distribution(c_train_genomes, c_test_genomes, mode):
+	
+	if mode == "CC":
+		path = './'
+		path2 = './'
+	else:
+		path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/'
+		path2 = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/'
+	master_file = open(path+"downloaded_3LA.txt").readlines()
 	master_file = map(str.strip, master_file)
 	
 	taxid_to_tla = {}
 	
 	for i in master_file:
-		file = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/kegg_dl/"+i).readlines()
+		file = open(path+"kegg_dl/"+i).readlines()
 		file = map(str.strip, file)
 	
 		threeLA = i.split("_")[0]
@@ -537,7 +544,7 @@ def tax_distribution(c_train_genomes, c_test_genomes):
 		taxid_to_tla[taxid] = threeLA
 	
 	def final_sets(c_genomes, taxid_to_tla): # c_genomes is either c_train_genomes or c_test_genomes
-		tax_path = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/ncbi_lineages_2020-05-04.csv").readlines()
+		tax_path = open(path2+"ncbi_lineages_2020-05-04.csv").readlines()
 		tax_path = map(str.strip, tax_path) 
 	
 		final_train_tlas = set(list(c_genomes))

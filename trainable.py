@@ -41,21 +41,21 @@ from genome_embeddings import models
 #sys.stdout = open('file_tout', 'w')
 #sys.stderr = open('file_terr', 'w')
 
-class MemCache:
-#	###########################
-#	# TO RUN ON CC:
-	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-12-2020/"
-	train_data=torch.load(DATA_FP+"corrupted_train_2020-12-04_10mods.pt")
-	test_data=torch.load(DATA_FP+"corrupted_test_2020-12-04_10mods.pt")
-	# To make predictions on (ROC + AUC)
-	num_features = int(train_data.shape[1]/2)
-
-	corrupt_test_data = test_data[:,:num_features]
-
-	# split X and y
-	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
-	
+#class MemCache:
+##	###########################
+##	# TO RUN ON CC:
+#	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-12-2020/"
+#	train_data=torch.load(DATA_FP+"corrupted_train_2020-12-04_10mods.pt")
+#	test_data=torch.load(DATA_FP+"corrupted_test_2020-12-04_10mods.pt")
+#	# To make predictions on (ROC + AUC)
+#	num_features = int(train_data.shape[1]/2)
+#
+#	corrupt_test_data = test_data[:,:num_features]
+#
+#	# split X and y
+#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+#	
 	###########################
 	# TO RUN ON LAPTOP
 	
@@ -545,8 +545,8 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 			)
 	
 		
-	#loaders = cv_dataloader_SINGLE(batch_size, num_features, kfolds, train_data, test_data)
-	loaders = cv_dataloader(batch_size, num_features, kfolds)
+	loaders = cv_dataloader_SINGLE(batch_size, num_features, kfolds, train_data, test_data)
+	#loaders = cv_dataloader(batch_size, num_features, kfolds)
 			
 	for epoch in range(num_epochs):
 		

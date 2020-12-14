@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 import torch
 
-def genomes2include():
+def genomes2include(mode):
 	"""
 	Figure out which genomes I want to include in my dataset based on those in selected_kegg.txt
 	
@@ -15,8 +15,13 @@ def genomes2include():
 	keepers (list) -- list of t-numbers to keep (e.g.: T04989)
 	"""
 	
+	if mode == 'CC':
+	    path = './'
+	else:
+	    path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/'
+	
 	# Use phylogenetically thinned list in selected_genomes.txt AND filter out non-bacteria
-	path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/selected_kegg.txt"
+	path = path+"selected_kegg.txt"
 	file = open(path).readlines()
 	file = list(map(str.strip, file))
 	
@@ -43,7 +48,7 @@ def genomes2include():
 	
 	return tla_to_tnum, keepers
 
-def load_kos(tla_to_tnum):
+def load_kos(tla_to_tnum, mode):
 	"""
 	Load mapping of genome to KOs encoded
 	
@@ -56,8 +61,14 @@ def load_kos(tla_to_tnum):
 	"""
 
 	### load each genome as a list of KOs
-	path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/annotations/annotations_list.txt"
-	master_file = open(path).readlines()
+	if mode == 'CC':
+		path = './annotations/'
+	else:
+	    path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/annotations/'
+	
+	
+	#path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/annotations/annotations_list.txt"
+	master_file = open(path+"annotations_list.txt").readlines()
 	master_file = list(map(str.strip, master_file))
 	
 	### Create dict mapping genomes to encoded KOs
@@ -65,7 +76,7 @@ def load_kos(tla_to_tnum):
 	# ko = list of all KOs annotated in genome
 	org_to_kos = {}
 	for i in master_file:
-	    file = open("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/annotations/"+i).readlines()
+	    file = open(path+i).readlines()
 	    file = list(map(str.strip, file))
 	   
 	    org = i.split("_")[0]
@@ -98,7 +109,7 @@ def load_kos(tla_to_tnum):
 
 	return org_to_kos, n_kos_tot, all_kos
 
-def load_mods():
+def load_mods(mode):
 	"""
 	Load mapping of genomes to modules and KOs encoded per module
 
@@ -109,7 +120,10 @@ def load_mods():
 	mod_sets (defaultdict of defaultdict of int) -- for each module, all alternative pathways and their counts 
 	"""
 	# Load mapping from organism (tla, e.g.: Pea) to complete modules encoded to KOs in each module
-	with open('/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/org_to_mod_to_kos.pkl', 'rb') as f:
+	
+	if mode == 'CC': path = './'
+	else: path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/'
+	with open(path+'org_to_mod_to_kos.pkl', 'rb') as f:
 	    org_to_mod_to_kos = pickle.load(f)
 	    
 	# Create dict: mod_sets
