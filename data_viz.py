@@ -436,7 +436,7 @@ def my_roc_curve(target, y_probas):
 	
 	return fig
 
-def genome_heatmap2(corrupted_test, idx, model):
+def genome_heatmap2(corrupted_test, idx, model, f1s, tns, fps, fns, tps, binary_pred):
 	from matplotlib.colors import LinearSegmentedColormap
 	import sklearn as sk
 	colours = ['black', 'green', 'orange', 'yellow', 'white']
@@ -461,17 +461,25 @@ def genome_heatmap2(corrupted_test, idx, model):
 	# Get predicted uncorrupted version of genome
 	corr_genome = corrupted_test[idx][:n_features]
 	true_genome = corrupted_test[idx][n_features:]
-	model.eval()
-	pred = model.forward(corr_genome)
-	pred = pred[0].tolist()
-	binary_pred = [1 if i > 0.5 else 0 for i in pred]
+#	model.eval()
+#	pred = model.forward(corr_genome)
+#	pred = pred[0].tolist()
+#	binary_pred = [1 if i > 0.5 else 0 for i in pred]
 	
-	print("Num on bits",int(sum(corr_genome)))
-	print("Original num on bits",int(sum(true_genome)))
-	print("Pred num on bits",int(sum(binary_pred)))
-	tn, fp, fn, tp = sk.metrics.confusion_matrix(true_genome, binary_pred).flatten()
+	binary_pred = binary_pred[idx]
+
+	#print("Num on bits",int(sum(corr_genome)))
+#	print("Original num on bits",int(sum(true_genome)))
+#	print("Pred num on bits",int(sum(binary_pred)))
+	tn = tns[idx]
+	fp = fps[idx]
+	fn = fns[idx]
+	tp = tps[idx]
+	#tn, fp, fn, tp = sk.metrics.confusion_matrix(true_genome, binary_pred).flatten()
 	print("tn",tn, "fp",fp, "fn",fn, "tp",tp)
-	print("F1", sk.metrics.f1_score(true_genome, binary_pred, zero_division=0))
+	#print("F1", sk.metrics.f1_score(true_genome, binary_pred, zero_division=0))
+	print(f1s[idx])
+	
 	
 	colour_pred = []
 	for i in zip(binary_pred, corr_genome, true_genome):
@@ -493,9 +501,9 @@ def genome_heatmap2(corrupted_test, idx, model):
 	ax1.imshow(uncorrupted, cmap=cm, interpolation='nearest')
 	ax2.imshow(corrupted, cmap=cm, interpolation='nearest')  
 	ax3.imshow(colour_pred, cmap=cm, interpolation='nearest')
-	ax1.set_title("Uncorrupt")
-	ax2.set_title("Corrupt")
-	ax3.set_title("Predicted")
+	ax1.set_title("Original (uncorrupted)")
+	ax2.set_title("Corrupted")
+	ax3.set_title("Generated")
 	
 	# turn off tick labels and markers
 	for i in (ax1, ax2, ax3):
@@ -738,9 +746,9 @@ def yucko_genome_heatmap2(corrupted_test, idx, model, all_kos):
 	ax1.imshow(uncorrupted, cmap=cm, interpolation='nearest')
 	ax2.imshow(corrupted, cmap=cm, interpolation='nearest')  
 	ax3.imshow(colour_pred, cmap=cm, interpolation='nearest')
-	ax1.set_title("Uncorrupt")
-	ax2.set_title("Corrupt")
-	ax3.set_title("Predicted")
+	ax1.set_title("Original (uncorrupted)")
+	ax2.set_title("Corrupted")
+	ax3.set_title("Generated")
 
 	return fig
 
