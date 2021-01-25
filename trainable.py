@@ -348,15 +348,6 @@ def vae_loss(pred, target, mu, logvar):
 	# Multiply KLD by factor of 10,000 such that it is on the same order of magnitude as BCE
 	KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) 
 	
-		
-	# Normalize KLD to prevent KLD from dominating loss
-	# Normalize by same number of elements as there are in the reconstruction
-#	KLD /= pred.shape[0]*pred.shape[1]
-#	BCE /= pred.shape[0]*pred.shape[1]
-#	KLD2 = KLD / pred.shape[0]*pred.shape[1]
-#	BCE2 = BCE / pred.shape[0]*pred.shape[1]
-
-	
 	loss = KLD + BCE
 	loss = torch.min(loss, 1000000000*torch.ones_like(loss))
 

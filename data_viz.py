@@ -25,6 +25,9 @@ def learning_curve(train_losses, test_losses, train_f1s, test_f1s):
 	Returns:
 	nothing -- plots figure
 	"""
+	
+	plt.rcParams.update({'font.size': 16})
+	
 	x_losses = [*range(len(train_losses))]
 	
 	fig, axs = plt.subplots(2, figsize=(20, 10))
@@ -405,7 +408,7 @@ def my_roc_curve(target, y_probas):
 
 	
 	
-	n_examples = 50 # will plot 50 example genes on ROC curve
+	n_examples = 100 # will plot 50 example genes on ROC curve
 	
 	# get colours for plotting
 	cm = plt.cm.get_cmap('gist_rainbow')
@@ -414,7 +417,7 @@ def my_roc_curve(target, y_probas):
 	colours = colours*2
 	
 	# plot
-	plt.rcParams.update({'font.size': 20})
+	   
 	fig, ax = plt.subplots(figsize=(20, 7))
 	a = random.sample(range(target.shape[1]), 50)
 	for i in range(len(a)):
@@ -439,7 +442,7 @@ def my_roc_curve(target, y_probas):
 def genome_heatmap2(corrupted_test, idx, model, f1s, tns, fps, fns, tps, binary_pred):
 	from matplotlib.colors import LinearSegmentedColormap
 	import sklearn as sk
-	colours = ['black', 'green', 'orange', 'yellow', 'white']
+	colours = ['black', 'green', 'magenta', 'yellow', 'white']
 	cmap_name = 'my_list'
 	
 	n_features = int(corrupted_test.shape[1]/2)
@@ -455,11 +458,14 @@ def genome_heatmap2(corrupted_test, idx, model, f1s, tns, fps, fns, tps, binary_
 	cm = LinearSegmentedColormap.from_list(cmap_name, colours, N=len(colours))
 	# Get uncorrupted version of genome
 	uncorrupted = corrupted_test[idx][n_features:].tolist()
+	print("Uncorrupted -- On:",str(int(sum(uncorrupted))),"Off:",str(int(n_features - sum(uncorrupted))))
+
 	uncorrupted.extend([4] * n_extension) # 100*100 - n_features
 	uncorrupted = np.reshape(uncorrupted, (n_rows, n_cols))  
 	
 	# Get predicted uncorrupted version of genome
 	corr_genome = corrupted_test[idx][:n_features]
+	print("Uncorrupted -- On:",str(int(sum(corr_genome))),"Off:",str(int(n_features - sum(corr_genome))))
 	true_genome = corrupted_test[idx][n_features:]
 #	model.eval()
 #	pred = model.forward(corr_genome)
@@ -476,7 +482,7 @@ def genome_heatmap2(corrupted_test, idx, model, f1s, tns, fps, fns, tps, binary_
 	fn = fns[idx]
 	tp = tps[idx]
 	#tn, fp, fn, tp = sk.metrics.confusion_matrix(true_genome, binary_pred).flatten()
-	print("tn",tn, "fp",fp, "fn",fn, "tp",tp)
+	print("Generated -- TN:",tn, "FP:",fp, "FN:",fn, "TP:",tp)
 	#print("F1", sk.metrics.f1_score(true_genome, binary_pred, zero_division=0))
 	print(f1s[idx])
 	
@@ -579,12 +585,12 @@ def tax_distribution(c_train_genomes, c_test_genomes, mode):
 	
 	return train_tax_dict, test_tax_dict
 
-def plot_tax_dist(c_train_genomes, c_test_genomes):
+def plot_tax_dist(c_train_genomes, c_test_genomes, mode):
 
 	n_train = str(int(len(c_train_genomes)/100))
 	n_test = str(int(len(c_test_genomes)/100))
 	
-	train_tax_dict, test_tax_dict = tax_distribution(c_train_genomes, c_test_genomes)
+	train_tax_dict, test_tax_dict = tax_distribution(c_train_genomes, c_test_genomes, mode)
 	
 	def phyla(tax_dict):
 		dist = []

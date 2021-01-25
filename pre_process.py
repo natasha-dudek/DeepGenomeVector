@@ -181,6 +181,7 @@ def train_test_split(keepers):
 	Duplicate train-test split from DAE
 	
 	Arguments:
+		keepers (list) -- tnums of genomes to get
 	
 	Returns:
 		train_genomes (list) -- list of genomes for training set
@@ -218,7 +219,7 @@ def prep_data(list_genomes, all_kos, org_to_kos, mode):
 	    data (np array) -- rows = genomes, columns = KOs, 1 = KO present in genome, 0 = KO absent in genome
     """
     
-    assert (mode == "test" or mode == "train")
+    #assert (mode == "test" or mode == "train")
     
     data = np.zeros(shape=(len(list_genomes),len(all_kos)))
 		
@@ -260,13 +261,13 @@ def create_mod_to_kos(org_to_mod_to_kos):
 	            mod_to_kos[mod] = mods[mod]
 	return mod_to_kos
 	
-def remove_duds(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos):
+def remove_duds(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, n_mods):
 	# remove genomes encoding < 10 modules
 	keep_idx = []
 	for i in range(train_data.shape[0]):
 	    tnum = train_genomes[i]
 	    org = tnum_to_tla[tnum]
-	    if len(org_to_mod_to_kos[org]) >= 10:
+	    if len(org_to_mod_to_kos[org]) >= n_mods:
 	        keep_idx.append(i)
 	train_data = train_data[keep_idx,:]
 	train_genomes = list(np.array(train_genomes)[keep_idx])

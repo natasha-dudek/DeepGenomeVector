@@ -5,7 +5,7 @@ import torch
 from collections import defaultdict
 
 # For one rep of one genome
-def heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos):
+def heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods):
     """
     For each genome, keep the KO's in 10 modules. Everything else should be zeros
     
@@ -16,7 +16,7 @@ def heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos):
     Returns:
     corrupted (np array) -- 
     """
-    n_mods = 10
+    #n_mods = 10
     keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)            
     #print(org, keeps)
     idxs = []
@@ -32,9 +32,9 @@ def heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos):
 
     return corrupted, keeps
 
-def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos):
+def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, n_mods):
     """
-    For each genome, keep the KO's in 1-10 modules. Everything else should be zeros
+    For each genome, keep the KO's in n_mods modules. Everything else should be zeros
     Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
     Note: only genomes with >= 1 module are included in the output
     Note: uses "cleaned" modules from mod_to_ko_clean  
@@ -45,7 +45,6 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
     train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
     n_corrupt (int) -- number of corrupted versions to make of each genome
     tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
-    method (str) -- method for performing corruption, "v1" | "v2"
     
     Returns:
     output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
@@ -63,18 +62,17 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
         n_tot_mods = len(org_to_mod_to_kos[org]) # number of modules in the genome 
         
         n_corrupted = 0
-        if n_tot_mods >= 10 and len(org_to_kos[tnum]) >= 500: # some genomes have mods annotated by no KOs annotated
-            uncorrupted = train_data[i]
-            while n_corrupted < n_corrupt: 
-                c_train_genomes.append(org)
-                
-                corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos)
+        uncorrupted = train_data[i]
+        while n_corrupted < n_corrupt: 
+            c_train_genomes.append(org)
+            
+            corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods)
 
-                genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
-                output.append(genome_out)
-                input_mods.append(in_mods)
-                line_counter += 1
-                n_corrupted += 1
+            genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
+            output.append(genome_out)
+            input_mods.append(in_mods)
+            line_counter += 1
+            n_corrupted += 1
             
     return torch.Tensor(output), c_train_genomes, input_mods
 
@@ -172,7 +170,7 @@ def get_n_corrupt(tnum_to_tla, train_genomes, mode):
     return n_corrupt
 
 
-def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, mode):
+def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, mode, n_mods):
     """
     For each genome, keep the KO's in 1-10 modules. Everything else should be zeros
     Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
@@ -209,7 +207,7 @@ def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos,
         while n_corrupted < n_corrupt: 
             c_train_genomes.append(org)
             
-            corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos)
+            corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods)
 
             genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
             output.append(genome_out)
