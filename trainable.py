@@ -41,9 +41,9 @@ from genome_embeddings import models
 #sys.stdout = open('file_tout', 'w')
 #sys.stderr = open('file_terr', 'w')
 
-#class MemCache:
-##	###########################
-##	# TO RUN ON CC:
+class MemCache:
+#	###########################
+#	# TO RUN ON CC:
 #	DATA_FP = "/home/ndudek/projects/def-dprecup/ndudek/hp_tuning_04-12-2020/"
 #	train_data=torch.load(DATA_FP+"corrupted_train_2020-12-04_10mods.pt")
 #	test_data=torch.load(DATA_FP+"corrupted_test_2020-12-04_10mods.pt")
@@ -56,36 +56,20 @@ from genome_embeddings import models
 #	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
 #	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 #	
-	###########################
-	# TO RUN ON LAPTOP
+#	##########################
+#	 TO RUN ON LAPTOP
+	# done 5, 0
+	train_data = torch.load("/Users/natasha/Desktop/vae/corrupted_train_2021-01-05_40mods.pt")
+	test_data = torch.load("/Users/natasha/Desktop/vae/corrupted_test_2021-01-05_40mods.pt")
 	
-#	train_data = torch.load("/Users/natasha/Desktop/corruptedv2_train_2020-09-30.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corruptedv2_test_2020-09-30.pt")
-
-#	train_data = torch.load("/Users/natasha/Desktop/corruptedv3_train_2020-10-01.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corruptedv3_test_2020-10-01.pt")
-
-#	train_data = torch.load("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/corrupted_train_07-17-20.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/genome_embeddings/data/corrupted_test_07-17-20.pt")
-
-#	# corrupt 50% on bits
-#	train_data = torch.load("/Users/natasha/Desktop/corruptedv0_train_2020-10-02.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corruptedv0_test_2020-10-02.pt")
-
-#	# extreme corruption
-#	train_data = torch.load("/Users/natasha/Desktop/corrupted_train_2020-09-04.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corrupted_test_2020-09-04.pt.pt")
-
-	# only corrupt 
-#	train_data = torch.load("/Users/natasha/Desktop/corrupted_train_2020-10-16_1mods.pt")
-#	test_data = torch.load("/Users/natasha/Desktop/corrupted_test_2020-10-16_1mods.pt.pt")
-
+	print("loaded train + test data")
+	
 	# To make predictions on (ROC + AUC)
-#	num_features = int(train_data.shape[1]/2)
-#	corrupt_test_data = test_data[:,:num_features]
-#	
-#	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
-#	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
+	num_features = int(train_data.shape[1]/2)
+	corrupt_test_data = test_data[:,:num_features]
+	
+	X = train_data[:,:num_features]  #corrupted genomes in first half of matrix columns
+	y = train_data[:,num_features:]  #uncorrupted in second half of matrix columns
 		
 def binarize(pred_tensor, replacement_threshold):
 	"""
@@ -373,6 +357,8 @@ def train_AE(config, reporter):
 	device = torch.device("cpu") #"cuda" if use_cuda else "cpu")
 	
 	num_features2 = MemCache.num_features
+	print(num_features2)
+	print('config["replacement_threshold"]',config["replacement_threshold"])
 	model = models.VariationalAutoEncoder(num_features2, int(config["nn_layers"]))
 	model = model.to(device)
 	model.train()
@@ -387,7 +373,6 @@ def train_AE(config, reporter):
 			
 	for epoch in range(config["num_epochs"]):
 		losses = []
-			
 		# enumerate batches in epoch
 		for batch_idx, (corrupt_data, target) in enumerate(loaders["train"]):
 			corrupt_data, target = corrupt_data.to(device), target.to(device)
@@ -402,7 +387,8 @@ def train_AE(config, reporter):
 			if (batch_idx+1) % 100 == 1:
 				train_loss = loss.item()
 				train_f1 = f1_score(pred, target, config["replacement_threshold"])
-				test_loss, test_f1 = cv_vae(model, loaders, replacement_threshold)
+				# note that "test_f1 / loss" is actually for a CV fold
+				test_loss, test_f1 = cv_vae(model, loaders, config["replacement_threshold"])
 				#y_probas = roc_auc(model)
 				reporter(test_f1=test_f1, train_f1=train_f1, test_loss=test_loss, train_loss=train_loss) #, auc_score=auc)	
 				model.train()

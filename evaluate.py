@@ -317,7 +317,7 @@ def compare_in_n_out(binary_pred, corrupted):
     
     fig = fig, ax = plt.subplots()
     plt.hist(perc_out, bins=50)
-    plt.xlabel('Percent of input KOs in output')
+    plt.xlabel('Percent of input genes in output')
     plt.ylabel('Count')
     
     
@@ -1008,7 +1008,6 @@ def plot_dist(generated, all_kos, mod_to_kos, model, test_data, idx=None):
     
 def df_for_phylip(generated, test_data, test_genomes, all_kos):
     """
-    Generate 100 synthetic genome vectors, add to df with test set genomes
     
     Arguments:
         generated_genomes (tensor) -- generated genomes 
@@ -1021,7 +1020,7 @@ def df_for_phylip(generated, test_data, test_genomes, all_kos):
     
     from sklearn.metrics.pairwise import pairwise_distances
     
-    n_gen = generated.shape[0] #test_data.shape[0] # number of fake genomes to generate
+    n_gen = generated.shape[0] # number of fake genomes
     
     # concatenate real and fake genomes
     concated = torch.cat((torch.Tensor(test_data), generated), 0).numpy()
