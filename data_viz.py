@@ -64,16 +64,6 @@ def learning_curve(train_losses, test_losses, train_f1s, test_f1s):
 	
 	return fig
 	
-
-def gan_learning_curve(generator_losses, critic_losses):
-	plt.plot(range(len(critic_losses)),critic_losses,marker='o', c='b',label='Critic',fillstyle='none')
-	plt.plot(range(len(generator_losses)),generator_losses,marker='o', c='g',label='Generator',fillstyle='none')
-	plt.legend(loc=1)
-	
-	plt.title("WGAN-GP Learning Curve")
-	plt.ylabel("W-Loss")
-	plt.xlabel("Experience")
-	
 def calc_svd(data):
 	"""
 	Perform truncated SVD on data (note: SVD works efficiently on sparse matrices, unlike PCA)
@@ -758,11 +748,19 @@ def yucko_genome_heatmap2(corrupted_test, idx, model, all_kos):
 
 	return fig
 
+def mods_by_genomes(org_to_mod_to_kos):	
+	
+	n_genomes = len(org_to_mod_to_kos)
+	_ = [list(org_to_mod_to_kos[i].keys()) for i in org_to_mod_to_kos]
+	n_mods = len(list(set([item for sublist in _ for item in sublist])))
+	
+	fig = plt.figure()
+	plt.hist([len(org_to_mod_to_kos[i]) for i in org_to_mod_to_kos], 50)
+	plt.xlabel("Number of modules per genome")
+	plt.ylabel("Frequency")
+	plt.title("Distribution of the # of modules (n="+str(n_mods)+") per genome (n="+str(n_genomes)+")")
 
-
-
-
-
+	return fig
 
 
 
