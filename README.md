@@ -14,7 +14,7 @@ pip install requirements.txt
 
 The core module is main.ipynb. This juptyer notebook is used to load the data, process and filter it, perform data exploration, train a single VAE model or load a trained model (i.e. the best model resulting from hyperparameter optimization), and then analyze the results and generate the figures seen in the manuscript. 
 
-To perform hyperparameter tuning, use the hpo_on_cluster.py module. Note that it is recommend to do this on an HPC cluster due to significant compute requirements. 
+To perform hyperparameter tuning, use the hpo.py module. Note that it is recommend to do this on an HPC cluster due to significant compute requirements. 
 
 Data was sourced from the [KEGG database](https://www.genome.jp/kegg/). A substantial amount of processing was performed on the data prior to input into the model. You can access processed training data here and test data here. 
 
