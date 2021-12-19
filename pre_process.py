@@ -807,3 +807,41 @@ def thin3():
 	#for i in final_genomes:
 	#	print (i, taxid_to_tla[i], tla_to_info[taxid_to_tla[i]][0], final_genomes[i].replace(" ", "_")+"*")
 	return final_genomes, taxid_to_tla, tla_to_info
+
+def get_tax():
+	# Map tnum -> taxids for all orgs in KEGG db
+	dl_path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/'
+	file = open(dl_path+'downloaded_3LA.txt').readlines()
+	file = list(map(str.strip, file))
+	
+	tnum_to_tla = {}
+	taxid_to_tnum = {}
+	for s in file:
+	    tla = s.split("_")[0]
+	    info_file = open(dl_path+'kegg_dl/'+s).readlines()
+	    info_file = list(map(str.strip, info_file))
+	    for i in info_file:
+	        if 'class="title10">Genome information' in i:
+	            tnum = i.split("href='/dbget-bin/www_bget?gn:")[1].split("'")[0]
+	        if '<b>Taxonomy</b></td><td>TAX:' in i:
+	            taxid = i.split("https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=")[1].split('">')[0]
+	
+	    taxid_to_tnum[taxid] = tnum
+	    tnum_to_tla[tnum] = tla
+	
+	tnum_to_taxid = {v:k for k,v in taxid_to_tnum.items()} 
+	
+	path = '/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/ncbi_lineages_2020-05-04.csv'
+	file = open(path).readlines()
+	file = map(str.strip, file) 
+	
+	tnum_to_tax = {}
+	
+	for i in file:
+	    lin = i.split(',')
+	    taxid = lin[0]
+	
+	    if taxid in taxid_to_tnum:
+	        tnum = taxid_to_tnum[taxid]
+	        tnum_to_tax[tnum] = lin[1:8] # domain - species
+	return (tnum_to_taxid, tnum_to_tax)	

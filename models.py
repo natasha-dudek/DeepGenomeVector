@@ -11,7 +11,7 @@ import math
 class VariationalAutoEncoder(nn.Module):
     # useful reading:
     # code example: https://gist.github.com/addy369/9387e4d557cec81ea4848a0dc588a158
-    # great VAE tutorial (purely theoretical): https://arxiv.org/pdf/1606.05908.pdf
+    # VAE tutorial (purely theoretical): https://arxiv.org/pdf/1606.05908.pdf
     
     def __init__(self, num_clusters, nn_layers):
         super().__init__()

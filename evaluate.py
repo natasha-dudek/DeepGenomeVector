@@ -13,6 +13,7 @@ import random
 import re
 import matplotlib.pyplot as plt
 from scipy import stats
+import seaborn as sns
 
 def hamming(target, b_pred):
     hs = []
@@ -619,7 +620,7 @@ def plot_metab_pathway_f1(process_to_mod, test_input_mods, f1s):
     
     return fig
 
-def map_proc_mod():
+def map_proc_mod1():
     process_to_mod = {}
     path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/kegg_modules.txt"
     file = open(path).readlines()
@@ -1484,16 +1485,6 @@ def plot_reconstruction_barh(f1s, c_test_genomes, tns, fps, fns, tps, uncorrupte
 
     return fig
 
-
-
-
-
-
-
-
-
-
-
 def snowplot(f1s, c_test_genomes, tns, fps, fns, tps, uncorrupted, corrupted, idx):
     num_charts = 3 # number of genomes for which to make pie charts
     indices = [i for i in range(len(f1s))] # original index of each genome in uncorrupted
@@ -1553,8 +1544,8 @@ def snowplot(f1s, c_test_genomes, tns, fps, fns, tps, uncorrupted, corrupted, id
     # TP = green
     # FN =  magenta
     # FP = yellow
-    colors = ['black', 'green', 'yellow', 'magenta']
-    labels = ["TN", "TP", "FP", "FN"]
+    colors = ['black', 'green', 'magenta', 'yellow']
+    labels = ["TN", "TP", "FN", "FP"]
     
     barWidth = 1
     lefts = 0
@@ -1725,4 +1716,284 @@ def arch_root(all_kos):
 	        barc_vec.append(0)
 	
 	return barc_vec
+
+def df_genus_genomes(idx_best, tla_best, tla_to_tnum, tnum_to_tax, binary_pred, test_genomes, test_data, train_genomes, train_data):
+	"""
+	Given a generated genome vector index, returns a df where rows are genomes and columns are genes, for:
+		- The generated genome vector
+		- The test set genome vector from which the input mods were sampled
+		- All genome vectors of the same genus in the test set
+	"""
+
+	tnum_best = tla_to_tnum[tla_best]
+	genus_best = tnum_to_tax[tnum_best][5]
 	
+	# Get reconstruction genome vector (bruc_reconstruction)
+	df_generated = pd.DataFrame(binary_pred[idx_best,:], columns=['Generated']).T
+
+	# get row for uncorrupted B. abortus 
+	bruc_best_idx = test_genomes.index(tnum_best) # indexing is different for binary_pred and test_genomes
+	df_orig = pd.DataFrame(test_data[bruc_best_idx,:], columns=[tnum_to_tax[tnum_best][6]]).T
+
+	# Create df with all Brucella genomes of interest
+	df = pd.concat([df_generated, df_orig])
+
+
+	# add data from training set Brucella genomes to df
+	labels = ['Generated', tnum_to_tax[tnum_best][6]]
+	for tnum in tnum_to_tax:
+	    genus = tnum_to_tax[tnum][5]
+	    if (genus == genus_best) and (tnum in train_genomes):
+	        i = train_genomes.index(tnum)
+	        train_genome = pd.DataFrame(train_data[i,:]).T
+	        df = df.append(train_genome, ignore_index = True)
+	        labels.append(tnum_to_tax[tnum][6])
+
+	df.index = labels
+
+	return df
+
+def diff_heatmap(df):
+	labels = df. index
+	
+	# Calculate num substitutions between genomes
+	data = []
+	for i, row1 in df.iterrows():
+	    diffs = []
+	    for j, row2 in df.iterrows():
+	        row1 = np.array(row1)
+	        row2 = np.array(row2)
+	        simm = np.matmul(row1, row2)
+	        diff = (np.sum(row1) - simm) + (np.sum(row2) - simm)
+	        diffs.append(diff)
+	    data.append(diffs)
+	
+	diff_df = pd.DataFrame(data, labels, columns=labels)
+	
+	# plot
+	fig = sns.clustermap(diff_df, cmap='Blues', annot=True, vmin=0, vmax=2000)
+
+	return fig
+
+def map_proc_mod():
+    mod_names = {}
+    process_to_mod = {}
+    path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/kegg_modules.txt"
+    file = open(path).readlines()
+    file = list(map(str.strip, file))
+    
+    type_proc = ""
+    for s in file:
+        if s[0] == "D": 
+            mod_names[s.split()[1]] = ' '.join(s.split()[2:]).split('[')[0].split(',')[0]
+    return mod_names 
+    
+def compare_inputs(test_input_mods, idx_best, org_to_mod_to_kos, train_genomes, tla_to_tnum, mod_names):
+	# What input modules were used for generated brucella abortus genome?
+	gen_mods = test_input_mods[idx_best]	
+	
+	# Which orgs have those mods?
+	mod_count = defaultdict(int)
+	all_ten = []
+	for tla in org_to_mod_to_kos:
+	    try:
+	        tnum = tla_to_tnum[tla]
+	    except KeyError: pass
+	    if tnum not in train_genomes: continue
+	    mods = list(org_to_mod_to_kos[tla].keys())
+	    for mod in mods:
+	        if mod in gen_mods:
+	            mod_count[mod] += 1 
+	    
+	    # of input mods to brucella genome, how many genomes have all ten?
+	    all_present = True
+	    for i in gen_mods:
+	        if i not in mods: all_present = False
+	    if all_present:
+	        all_ten.append(tnum) 	
+	
+	
+	mods = [mod_names[i] for i in mod_count.keys()]
+	vals = mod_count.values()
+	vals, mods = zip(*sorted(zip(vals, mods), reverse=False))
+	
+	fig, ax = plt.subplots()
+	plt.barh(mods, vals, color='#3385ff')
+	plt.xlabel("# genomes encoding module")
+	
+	return fig, all_ten
+	
+def compare_venn(genome1, genome2, genome3, df):
+	from matplotlib_venn import venn3, venn3_circles
+	
+	canis = df.loc[genome1].tolist()
+	microti = df.loc[genome2].tolist()
+	generated = df.loc[genome3].tolist()
+	
+	canis2 = []
+	microti2 = []
+	generated2 = []
+	for i in range(len(canis)):
+	    if canis[i] == microti[i] == generated[i] == 1:
+	        canis2.append(str(i)+'shared3')
+	        microti2.append(str(i)+'shared3')
+	        generated2.append(str(i)+'shared3')
+	    elif canis[i] == microti[i] == 1:
+	        canis2.append(str(i)+'sharedCM')
+	        microti2.append(str(i)+'sharedCM')  
+	    elif canis[i] == generated[i] == 1:
+	        canis2.append(str(i)+'sharedCG')
+	        generated2.append(str(i)+'sharedCG')   
+	    elif microti[i] == generated[i] == 1:
+	        microti2.append(str(i)+'sharedCG')   
+	        generated2.append(str(i)+'sharedCG')
+	    elif canis[i] == 1:
+	        canis2.append(str(i)+'unique')
+	    elif microti[i] == 1:
+	        microti2.append(str(i)+'unique')
+	    elif generated[i] == 1:
+	        generated2.append(str(i)+'unique')
+	
+	fig, ax = plt.subplots(figsize=(6, 6))
+	fig = venn3([set(canis2), set(microti2), set(generated2)], 
+set_labels = (genome1, genome2, genome3))
+	
+	return fig, ax
+
+def get_ten_closest(index_now, tnum_now, test_genomes, train_genomes, test_data, train_data, binary_pred, tnum_to_tax):
+
+	# Get reconstruction genome vector (bruc_reconstruction)
+	generated = binary_pred[index_now,:]
+	# Get GV from which it was derived
+	bruc_best_idx = test_genomes.index(tnum_now) # indexing is different for binary_pred and test_genomes
+	orig = test_data[bruc_best_idx,:]
+	
+	
+	hammings = []
+	idxs = []
+	for i, row in enumerate(train_data):
+	    hl = hamming_loss(generated, row)
+	    hammings.append(hl)
+	    idxs.append(i)
+	    
+	hammings, train_genomes2, idxs = zip(*sorted(zip(hammings, train_genomes, idxs), reverse=False))
+	hamm_10 = hammings[:10]
+	closest_genomes = train_genomes2[:10]
+	idx_10 = idxs[:10]
+
+	labels = [tnum_to_tax[i][6] for i in closest_genomes] + [tnum_to_tax[tnum_now][6]+'*', 'Generated']
+	
+	ten_df = pd.DataFrame(np.vstack((train_data[idx_10, :], test_data[bruc_best_idx,:], generated)), labels)
+
+	return ten_df, closest_genomes
+	
+def genus_boxplot_partial(c_test_genomes, tla_to_tnum, tnum_to_tax, tax_groups, f1s):
+	import pylab as P
+	
+	genus_count = defaultdict(int)
+	genus_f1 = defaultdict(list)
+	for i, tla in enumerate(c_test_genomes):
+	    tnum = tla_to_tnum[tla]
+	    genus = tnum_to_tax[tnum][5]
+	    genus_count[genus] = tax_groups['genus'].count(genus)
+	    genus_f1[genus].append(f1s[i])
+	
+	group_0 = []
+	group_1 = []
+	group_2 = []
+	group_3 = []
+	group_4 = []
+	group_5 = []
+	genus_results_b = []
+	for genus in genus_count:
+	    if genus_count[genus] > 6: continue # skip '' (unknown genus)
+	    
+	    if genus_count[genus] == 0: group_0.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 1: group_1.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 2: group_2.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 3: group_3.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 4: group_4.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 5: group_5.append(np.median(genus_f1[genus]))
+	
+	return [group_0, group_1, group_2, group_3, group_4, group_5]
+
+def genus_boxplot(c_test_genomes, tla_to_tnum, tnum_to_tax, tax_groups, f1s):
+	import pylab as P
+	
+	genus_count = defaultdict(int)
+	genus_f1 = defaultdict(list)
+	for i, tla in enumerate(c_test_genomes):
+	    tnum = tla_to_tnum[tla]
+	    genus = tnum_to_tax[tnum][5]
+	    genus_count[genus] = tax_groups['genus'].count(genus)
+	    genus_f1[genus].append(f1s[i])
+	
+	group_0 = []
+	group_1 = []
+	group_2 = []
+	group_3 = []
+	group_4 = []
+	group_5 = []
+	genus_results_b = []
+	for genus in genus_count:
+	    if genus_count[genus] > 6: continue # skip '' (unknown genus)
+	    
+	    if genus_count[genus] == 0: group_0.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 1: group_1.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 2: group_2.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 3: group_3.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 4: group_4.append(np.median(genus_f1[genus]))
+	    if genus_count[genus] == 5: group_5.append(np.median(genus_f1[genus]))
+	
+	fig, ax = plt.subplots(figsize=(6, 6))
+	#ax.boxplot([group_0, group_1, group_2, group_3, group_4, group_5], labels=[0,1,2,3,4,5], sym='.')
+	# ax.set_title('', fontsize=10)
+	# ax.set_xlabel('Number of same-genus genomes in the training set')
+	# ax.set_ylabel('F1 score')
+	
+	for i, group in enumerate([group_0, group_1, group_2, group_3, group_4, group_5]):
+	    x = np.random.normal(1+i, 0.08, size=len(group)) # scatter
+	    P.plot(x, group, color='#4fc657', marker='.', linestyle="None", alpha=0.5, markersize = 10) 
+	
+	bp = ax.boxplot([group_0, group_1, group_2, group_3, group_4, group_5], labels=[0,1,2,3,4,5], sym='.', showfliers=False) 
+	
+	# Change outline color, fill color and linewidth of the boxes
+	for box in bp['boxes']:
+	    # Change outline color
+	    box.set( color='#000000', linewidth=0.6, linestyle='-')
+	
+	# Change linewidth of the whiskers
+	for whisker in bp['whiskers']:
+	    whisker.set(color='#000000', linewidth=0.6, linestyle='-')
+	
+	# Change color and linewidth of the caps
+	for cap in bp['caps']:
+	    cap.set(color='#000000', linewidth=0.6)
+	
+	# Change color and linewidth of the medians
+	for median in bp['medians']:
+	    median.set(color='#000000', linewidth=0.6)
+	    
+	ax.set_xlabel('# of same-genus genome vectors in training set')
+	ax.set_ylabel('F1 score')
+	
+	return fig, [group_0, group_1, group_2, group_3, group_4, group_5]
+	
+def genus_boxplot_stats(groups):
+	from pingouin import anova
+	from statsmodels.stats.multicomp import pairwise_tukeyhsd
+	
+	scores = []
+	dep_var = []
+	
+	for i, name in enumerate(groups):
+	    scores.extend(name)
+	    dep_var.extend([i]*len(name))
+	df = pd.DataFrame([dep_var, scores], ['group', 'F1']).T
+	
+	# one way anova
+	an = anova(data=df, dv='F1', between='group')
+	
+	m_comp = pairwise_tukeyhsd(endog=df['F1'], groups=df['group'], alpha=0.05)
+	
+	return an, m_comp

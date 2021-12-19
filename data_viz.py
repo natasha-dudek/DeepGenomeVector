@@ -30,7 +30,7 @@ def learning_curve(train_losses, test_losses, train_f1s, test_f1s):
 	
 	x_losses = [*range(len(train_losses))]
 	
-	fig, axs = plt.subplots(2, figsize=(20, 10))
+	fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 	
 	axs[0].set_title("Optimization Learning Curve")
 	axs[1].set_title("Performance Learning Curve")
@@ -38,14 +38,14 @@ def learning_curve(train_losses, test_losses, train_f1s, test_f1s):
 	axs[0].set_ylim(10**4,10**7)
 	axs[1].set_ylim(0,1)
 	
-	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=13)
-	axs[0].plot(x_losses, test_losses, marker='.', c='#33cc33', label='CV', markersize=13)
+	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[0].plot(x_losses, test_losses, marker='.', c='#ff6666', label='CV', markersize=5)
 	
-	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=13)
-	axs[1].plot(x_losses, test_f1s, marker='.', c='#33cc33', label='CV', markersize=13)
+	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[1].plot(x_losses, test_f1s, marker='.', c='#ff6666', label='CV', markersize=5)
 	
-	axs[0].set_xlim(0,x_losses[-1]+1)
-	axs[1].set_xlim(0,x_losses[-1]+1)
+	axs[0].set_xlim(-5,x_losses[-1]+5)
+	axs[1].set_xlim(-5,x_losses[-1]+5)
 	
 	axs[0].set_ylabel('Loss (KLD + BCE)')
 	axs[0].semilogy()
@@ -380,24 +380,6 @@ def my_roc_curve(target, y_probas):
 	fpr_micro, tpr_micro, _ = roc_curve(target.ravel(), y_probas.ravel())
 	roc_auc["micro"] = auc(fpr_micro, tpr_micro)
 
-	
-	# THIS IS INCLUDING MICROAVERAGE IN MACROAVERAGE CALC
-	# Calculate macro-average
-	# First aggregate all false positive rates
-#	all_fpr = np.unique(np.concatenate([fpr[x] for x in range(target.shape[1]) if not np.isnan(fpr[x]).any()]))
-
-	# Then interpolate all ROC curves at this points
-#	mean_tpr = np.zeros_like(all_fpr)
-#	for i in range(target.shape[1]):
-#		if np.isnan(fpr[i]).any(): continue
-#		mean_tpr += interp(all_fpr, fpr[i], tpr[i])
-
-	# Finally average it and compute AUC
-#	mean_tpr /= target.shape[1]
-#	roc_auc["macro"] = auc(all_fpr, mean_tpr)
-
-	
-	
 	n_examples = 100 # will plot 50 example genes on ROC curve
 	
 	# get colours for plotting
@@ -408,23 +390,23 @@ def my_roc_curve(target, y_probas):
 	
 	# plot
 	   
-	fig, ax = plt.subplots(figsize=(20, 7))
+	fig, ax = plt.subplots(figsize=(5, 5))
 	a = random.sample(range(target.shape[1]), 50)
 	for i in range(len(a)):
 		plt.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5,
-			 lw=2) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
+			 lw=1) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
 	plt.plot(fpr_micro, tpr_micro, color='black', 
-			 lw=5, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
+			 lw=2, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
 #	plt.plot(all_fpr, mean_tpr, color='blue', 
 #			 lw=5, label='Macro-average (AUC = %0.2f)' % roc_auc["macro"])			 
 	plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
-	plt.xlim([0.0, 1.0])
-	plt.ylim([0.0, 1.05])
-	ax.set_ylim([0,1])
+	plt.xlim([-0.01, 1.01])
+	plt.ylim([-0.01, 1.01])
+	#ax.set_ylim([0,1])
 	plt.xlabel('False Positive Rate')
 	plt.ylabel('True Positive Rate')
 	#plt.title('ROC for 50 randomly selected genes + micro-average')
-	plt.legend(loc="lower right")
+	plt.legend(loc="upper right")
 	#plt.show()
 	
 	return fig
@@ -764,10 +746,118 @@ def mods_by_genomes(org_to_mod_to_kos):
 
 
 
+def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y_probas):
+	"""
+	Plots a learning curve
+	
+	Arguments:
+	train_y -- list of values for training dataset (e.g.: loss scores, F1 score)
+	test_y -- list of values for test dataset (e.g.: loss scores, F1 score)
+	type_curve -- [optimization | performance | any_string] used to put descriptive title + axis labels on plot
+	
+	Returns:
+	nothing -- plots figure
+	"""
+	
+	plt.rcParams.update({'font.size': 16})
+	
+	x_losses = [*range(len(train_losses))]
+	
+	fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+	
+	axs[0].set_title("Optimization Learning Curve")
+	axs[1].set_title("Performance Learning Curve")
+	
+	axs[0].set_ylim(10**4,10**7)
+	axs[1].set_ylim(0,1)
+	
+	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[0].plot(x_losses, test_losses, marker='.', c='#ff6666', label='CV', markersize=5)
+	
+	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[1].plot(x_losses, test_f1s, marker='.', c='#ff6666', label='CV', markersize=5)
+	
+	axs[0].set_xlim(-5,x_losses[-1]+5)
+	axs[1].set_xlim(-5,x_losses[-1]+5)
+	
+	axs[0].set_ylabel('Loss (KLD + BCE)')
+	axs[0].semilogy()
+	axs[1].set_ylabel('F1 score')
+	
+	axs[0].set_xlabel('Experience')
+	axs[1].set_xlabel('Experience')
+	
+	axs[1].axhline(y=max(test_f1s), color='r', dashes=(1,1))
+	print("max F1 score", max(test_f1s))
+	
+	axs[0].legend(loc="upper right")
+	axs[1].legend(loc="lower right")
+	#axs[1].legend(loc="lower right")
+		
+	######## ROC/AUC calculations
+	fpr = dict()
+	tpr = dict()
+	roc_auc = dict()	
+	
+	n_genomes = target.shape[0]
+	n_genes = target.shape[1]
+	
+	# Calculate scores for each individual gene
+	for i in range(n_genes):
+		fpr[i], tpr[i], thresh = roc_curve(target[:, i], y_probas[:, i])
+		
+		if np.isnan(fpr[i]).any():
+#			print("ERROR ON ROW i",i)
+#			print("num 1s",np.sum(target[:, i]))
+#			print("num 0s",n_genomes - np.sum(target[:, i]))
+#			print("sum 1s and 0s", n_genomes)
+#			print("target[:, i]", np.isnan(np.max(target[:, i])))
+#			print("y_probas[:, i]", np.isnan(np.max(y_probas[:, i])))
+			continue
+		
+			roc_auc[i] = auc(fpr[i], tpr[i])
+	
+	 # Calculate micro-average
+#	fpr["micro"], tpr["micro"], _ = roc_curve(target.ravel(), y_probas.ravel())
+#	roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+	fpr_micro, tpr_micro, _ = roc_curve(target.ravel(), y_probas.ravel())
+	roc_auc["micro"] = auc(fpr_micro, tpr_micro)
 
+	n_examples = 100 # will plot 50 example genes on ROC curve
+	
+	# get colours for plotting
+	#cm = plt.cm.get_cmap('gist_rainbow')
+	cm = plt.cm.get_cmap('brg')
+	c = np.linspace(0, 1, 50) # start, stop, how_many
+	colours = [cm(i) for i in c]
+	colours = colours*2
+	
+	# plot
+	   
+	ax = axs[2]
+	a = random.sample(range(target.shape[1]), 50)
+	for i in range(len(a)):
+		plt.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5,
+			 lw=1) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
+	plt.plot(fpr_micro, tpr_micro, color='black', 
+			 lw=2, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
+	plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--', label='Micro-average')
 
+	plt.xlim([-0.01, 1.01])
+	plt.ylim([0, 1.0])
+	#ax.set_ylim([0,1])
 
-
+	#plt.title('ROC for 50 randomly selected genes + micro-average')
+	#plt.legend(loc="lower right")
+	#plt.show()
+	
+	axs[2].set_xlabel('False Positive Rate')
+	axs[2].set_ylabel('True Positive Rate')
+	axs[2].set_title('ROC Curve')
+	
+	plt.tight_layout()
+	
+	return fig
 
 
 

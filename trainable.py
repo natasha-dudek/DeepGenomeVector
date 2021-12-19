@@ -229,7 +229,6 @@ def cv_vae(model, loaders, replacement_threshold, device=torch.device("cpu")):
 	Arguments:
 	model -- pytorch model
 	loaders (dict of DataLoaders) -- dictionary of dataloader, here we use loaders["cv"]
-	criterion -- pytorch criterion for evaluating model (e.g.: loss)
 	replacement_threshold -- threshold for converting predicted probabilities to 1's or 0's
 	device (str) -- cpu or cuda
 	
@@ -299,12 +298,12 @@ def cv_dae(model, loaders, replacement_threshold, criterion, device=torch.device
 #	#auc = roc_auc_score(MemCache.target, y_probas.numpy(), average="macro")
 #	return y_probas
 
-def auto_garbage_collect(pct=80.0):
-	"""
-	If memory usage is high, call garbage collector
-	"""
-	if psutil.virtual_memory().percent >= pct:
-		gc.collect()
+	def auto_garbage_collect(pct=80.0):
+		"""
+		If memory usage is high, call garbage collector
+		"""
+		if psutil.virtual_memory().percent >= pct:
+			gc.collect()
 
 def vae_loss(pred, target, mu, logvar):
 	"""
