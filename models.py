@@ -3,11 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import math
-
 class VariationalAutoEncoder(nn.Module):
     # useful reading:
     # code example: https://gist.github.com/addy369/9387e4d557cec81ea4848a0dc588a158

@@ -1,11 +1,12 @@
-import torch
-import torch.nn as nn
+import random
+
+import numpy as np
 import sklearn as sk
 from sklearn.preprocessing import Binarizer
 from sklearn.metrics import accuracy_score, pairwise_distances
+import torch
+import torch.nn as nn
 from torch.autograd import Variable
-import random
-import numpy as np
 
 def f1_score(pred_non_bin, target, replacement_threshold):
     """

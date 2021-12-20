@@ -28,11 +28,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets, transforms
 
-from genome_embeddings import data_viz
-from genome_embeddings import evaluate
 from genome_embeddings import models
-from genome_embeddings import train_test
-from genome_embeddings import models 
 
 #os.system("rm file_tout")
 #os.system("rm file_terr")
@@ -458,21 +454,24 @@ def min_hamming_dist(pred, train_data):
 	
 		
 		
-def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, train_data, test_data):
+def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, train_data, test_data, BASE_DIR):
 	"""
 	Train autoencoder, save model and y_probas 
 	
 	Arguments:
-	config (dict) -- contains parameter and hyperparameter settings for a given trial
-		nn_layers -- number of layers in neural net
-		weight_decay -- weight_decay
-		batch_size - batch_size to use for training data loader
-		kfolds -- number of folds for K-fold cross validation
-		num_epochs -- number of epochs for which to train
-	reporter (progress_reporter) -- ray tune progress reporter
-	
+		nn_layers (int) -- number of layers in neural net
+		weight_decay (float) -- weight_decay
+		lr (float) -- learning rate
+		batch_size (int) - batch_size to use for training data loader
+		kfolds (int) -- number of folds for K-fold cross validation
+		num_epochs (int) -- number of epochs for which to train
+		replacement_threshold
+		train_data
+		test_data
+		BASE_DIR
+		
 	Returns:
-	None
+		kld, bce, train_losses, test_losses, train_f1s, test_f1s, model
 	"""	
 	kld = []
 	bce = []

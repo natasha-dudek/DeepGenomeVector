@@ -1,19 +1,19 @@
+from collections import defaultdict
+import random
+import re
+
+from copy import deepcopy
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pickle
+from scipy import stats
+import seaborn as sns
 import sklearn as sk
 from sklearn.metrics import hamming_loss
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
-from collections import defaultdict
-import pandas as pd
-import random
-from copy import deepcopy
-import numpy as np
-import pickle
 import torch
-import random
-import re
-import matplotlib.pyplot as plt
-from scipy import stats
-import seaborn as sns
 
 def hamming(target, b_pred):
     hs = []
