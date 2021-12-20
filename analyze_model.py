@@ -333,11 +333,7 @@ def tax_cm_histogram(phylum_stats, save_path):
     textstr = "Phylum \n"
     for i in num_to_phyla:
         textstr += str(i)+": "+num_to_phyla[i]+"\n"
-    plt.text(30, 0,textstr)#, horizontalalignment='center', verticalalignment='center')
-    
-    
-#     fig.subplots_adjust(top=0.9)
-    
+    plt.text(30, 0,textstr)   
 
     plt.savefig(save_path+"hist_confusion_matric_tax.png", dpi=200, bbox_inches='tight')
 
@@ -352,11 +348,7 @@ def print_f1_per_phylum(phylum_stats):
     """
     
     for i in phylum_stats:
-        print(i.strip("*"), round(np.median(phylum_stats[i]["f1"]),2),#, 
-    #          np.median(phylum_stats[i]["tn"]),
-    #          np.median(phylum_stats[i]["fp"]),
-    #          np.median(phylum_stats[i]["fn"]),
-    #          np.median(phylum_stats[i]["tp"]),
+        print(i.strip("*"), round(np.median(phylum_stats[i]["f1"]),2),
               np.median(phylum_stats[i]["n_genes"]))
 
 def genes_f1(f1s, n_genes, save_path):
@@ -376,13 +368,6 @@ def genes_f1(f1s, n_genes, save_path):
     plt.figure(num=None, figsize=(15, 6), dpi=80, facecolor='w', edgecolor='k')
     xs = []
     ys = []
-    
-#     for i in phylum_stats:
-#         x = np.median(phylum_stats[i]["n_genes"])
-#         y = round(np.median(phylum_stats[i]["f1"]),2)
-#         plt.scatter(x, y, color='b')
-#         xs.append(x)
-#         ys.append(y)
 
     for x, y in zip(n_genes, f1s):
         plt.scatter(x, y, color='b')
@@ -451,19 +436,13 @@ def pathway_perf(transporters_path, abx_res_path, rps_path):
     atp_syn = ['M00144','M00145','M00142','M00143','M00146','M00147','M00149',
                 'M00150','M00148','M00162','M00151','M00152','M00154','M00155',
                 'M00153','M00417','M00416','M00156','M00157','M00158','M00159','M00160']
-    
-#    metab = [transporters, abx_res, rps, central_carbon, carbon_fixation,
-#            methane_metab, nitrogen_metb, sulfur_metab, photosynthesis, atp_syn]    
-    
+        
     metab = {"transporters":transporters, "abx_res":abx_res, "rps":rps, "central_carbon":central_carbon,
             "carbon_fixation":carbon_fixation, "methane_metab":methane_metab, "nitrogen_metb":nitrogen_metb,
             "sulfur_metab":sulfur_metab, "photosynthesis":photosynthesis, "atp_syn":atp_syn}
     
     return metab
 
-# for each mod, get its index position in df
-# then compare column in b_pred to target
-# calculate F1 score for each column 
 def f1_per_brite(brite, cluster_names, b_pred_np, target):
     """
     Calculate the median F1 of genes within a BRITE category / pathway across all genomes
@@ -502,7 +481,6 @@ def f1_per_bright_group(metab, cluster_names, b_pred_np, target):
     """
     print("brite_category, median_F1, n_genes_in_group")
     for i in metab:
-        #if brite != transporters:
         print(i, f1_per_brite(metab[i], cluster_names, b_pred_np, target), len(metab[i]))
         
         

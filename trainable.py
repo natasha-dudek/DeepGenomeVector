@@ -32,7 +32,6 @@ from genome_embeddings import data_viz
 from genome_embeddings import evaluate
 from genome_embeddings import models
 from genome_embeddings import train_test
-from genome_embeddings import util
 from genome_embeddings import models 
 
 #os.system("rm file_tout")
@@ -280,30 +279,12 @@ def cv_dae(model, loaders, replacement_threshold, criterion, device=torch.device
 				
 	return loss, f1	  
 
-#
-#def roc_auc(model):
-#	"""
-#	Create probability predictions
-#	
-#	Arguments:
-#	model -- pytorch model
-#	Note: uses corrupted test_data from MemCache
-#	
-#	Returns:
-#	y_probas -- predicted probabilities
-#	"""
-#	model.eval()
-#	with torch.no_grad():
-#		y_probas = model(MemCache.corrupt_test_data)
-#	#auc = roc_auc_score(MemCache.target, y_probas.numpy(), average="macro")
-#	return y_probas
-
-	def auto_garbage_collect(pct=80.0):
-		"""
-		If memory usage is high, call garbage collector
-		"""
-		if psutil.virtual_memory().percent >= pct:
-			gc.collect()
+def auto_garbage_collect(pct=80.0):
+	"""
+	If memory usage is high, call garbage collector
+	"""
+	if psutil.virtual_memory().percent >= pct:
+		gc.collect()
 
 def vae_loss(pred, target, mu, logvar):
 	"""
@@ -493,11 +474,8 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 	Returns:
 	None
 	"""	
-	print("11:32")
-	kld0 = []
-	kld1 = []
-	bce0 = []
-	bce1 = []
+	kld = []
+	bce = []
 	train_losses = []
 	test_losses = []
 	train_f1s = []
@@ -535,8 +513,8 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 			
 			loss, KLD, BCE = vae_loss(pred, target, mu, logvar)
 			
-			kld0.append(KLD)
-			bce0.append(BCE)
+			kld.append(KLD)
+			bce.append(BCE)
 		  
 			loss.backward()
 			torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
@@ -569,7 +547,7 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 	# if memory usage is high, may be able to free up space by calling garbage collect
 	auto_garbage_collect()  
 	
-	return kld0, bce0, train_losses, test_losses, train_f1s, test_f1s, model
+	return kld, bce, train_losses, test_losses, train_f1s, test_f1s, model
 
 def hpo_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, train_data, test_data):
 	"""
@@ -650,3 +628,27 @@ def hpo_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replace
 			
 	# if memory usage is high, may be able to free up space by calling garbage collect
 	auto_garbage_collect()  
+
+def save_model(n_mods, kld, bce, train_losses, test_losses, train_f1s, test_f1s, model):
+	"""
+	Save trained model and associated data
+	
+	Arguments:
+		n_mods (int) -- max # mods retained during corruption 
+		kld (list) -- list of KLD losses during training
+		bce (list) -- list of BCE losses during training
+		train_losses (list) -- training losses (KLD + BCE)
+		test_losses (list) -- test losses (KLD + BCE)
+		train_f1s (list) -- training F1	scores
+		test_f1s (list) -- test F1 scores
+		model
+		
+	"""
+	torch.save(model.state_dict(), BASE_DIR+"_"+n_mods+"_model.pt")
+	
+	torch.save(train_losses, BASE_DIR+"_"+n_mods+"_train_losses.pt")
+	torch.save(test_losses, BASE_DIR+"_"+n_mods+"_test_losses.pt")
+	torch.save(bce, BASE_DIR+"_"+n_mods+"_bce.pt")
+	torch.save(kld, BASE_DIR+"_"+n_mods+"_kld.pt")
+	torch.save(train_f1s, BASE_DIR+"_"+n_mods+"_train_f1s.pt")
+	torch.save(test_f1s, BASE_DIR+"_"+n_mods+"_test_f1s.pt")

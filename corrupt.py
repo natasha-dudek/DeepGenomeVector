@@ -1,219 +1,144 @@
+from collections import defaultdict
 import random
 import sys
+
 import numpy as np
 import torch
-from collections import defaultdict
 
-# For one rep of one genome
-def heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods):
-    """
-    For each genome, keep the KO's in 10 modules. Everything else should be zeros
-    
-    Arguments:
-    org (str) -- tla for genome (e.g.: "aha")
-    n_max (int) -- the maximum number of mods to select for corrupted version of any given genome
-    
-    Returns:
-    corrupted (np array) -- 
-    """
-    #n_mods = 10
-    keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)            
-    #print(org, keeps)
-    idxs = []
-    for mod in keeps:
-        for ko in org_to_mod_to_kos[org][mod]:
-        #for ko in mod_to_ko_clean[mod]:
-            idxs.append(all_kos.index(ko))
+def heart_of_corruption(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods):
+	"""
+	For each genome vector, keep the KO's in n_mods modules. All other bits will be converted to zeros.
+	
+	Arguments:
+	org (str) -- tla for genome (e.g.: "aha")
+	n_max (int) -- the maximum number of mods to select for corrupted version of any given genome
+	
+	Returns:
+	corrupted (np array) -- vector representing corrupted version of a genome
+	"""
+	keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)			
+	idxs = []
+	for mod in keeps:
+		for ko in org_to_mod_to_kos[org][mod]:
+			idxs.append(all_kos.index(ko))
 
-    # create corrupted version of genome that only has those mods
-    corrupted = np.zeros(n_kos_tot)
-    for i in idxs:
-        corrupted[i] = 1
+	# create corrupted version of genome that only has those mods
+	corrupted = np.zeros(n_kos_tot)
+	for i in idxs:
+		corrupted[i] = 1
 
-    return corrupted, keeps
+	return corrupted, keeps
 
-def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, n_mods):
-    """
-    For each genome, keep the KO's in n_mods modules. Everything else should be zeros
-    Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
-    Note: only genomes with >= 1 module are included in the output
-    Note: uses "cleaned" modules from mod_to_ko_clean  
-        I.e. most common set of KOs per module, rather than 20 variants of each mod
-    
-    Arguments:
-    train_data (tensor) -- rows = uncorrupted genomes, columns = KOs
-    train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
-    n_corrupt (int) -- number of corrupted versions to make of each genome
-    tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
-    
-    Returns:
-    output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
-    c_train_genomes -- names of genomes in the order they appear in output
-    """
-        
-    output = [] 
-    c_train_genomes = []
-    n_kos_tot = train_data.shape[1]
-    input_mods = []
-    
-    line_counter = 0
-    for i, tnum in enumerate(train_genomes):
-        org = tnum_to_tla[tnum]
-        n_tot_mods = len(org_to_mod_to_kos[org]) # number of modules in the genome 
-        
-        n_corrupted = 0
-        uncorrupted = train_data[i]
-        while n_corrupted < n_corrupt: 
-            c_train_genomes.append(org)
-            
-            corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods)
+def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods):
+	"""
+	Perform corruptions on a set of genome vector. This means keep the KO's in n_mods modules for each genome vector. All other bits will be converted to zeros.
+	
+	Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
+	Note: only genomes with >= 1 module are included in the output
+	Note: uses "cleaned" modules from mod_to_ko_clean  
+		I.e. most common set of KOs per module, rather than 20 variants of each mod
+	
+	Arguments:
+	train_data (tensor) -- rows = uncorrupted genomes, columns = KOs
+	train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
+	n_corrupt (int) -- number of corrupted versions to make of each genome
+	tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
+	
+	Returns:
+	output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
+	c_train_genomes (list) -- names of genomes in the order they appear in output
+	"""
+		
+	output = [] 
+	c_train_genomes = []
+	n_kos_tot = train_data.shape[1]
+	input_mods = []
+	
+	line_counter = 0
+	for i, tnum in enumerate(train_genomes):
+		org = tnum_to_tla[tnum]
+		n_tot_mods = len(org_to_mod_to_kos[org]) # number of modules in the genome 
+		
+		n_corrupted = 0
+		uncorrupted = train_data[i]
+		while n_corrupted < n_corrupt: 
+			c_train_genomes.append(org)
+			
+			corrupted, in_mods = heart_of_corruption(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods)
 
-            genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
-            output.append(genome_out)
-            input_mods.append(in_mods)
-            line_counter += 1
-            n_corrupted += 1
-            
-    return torch.Tensor(output), c_train_genomes, input_mods
+			genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
+			output.append(genome_out)
+			input_mods.append(in_mods)
+			line_counter += 1
+			n_corrupted += 1
+			
+	return torch.Tensor(output), c_train_genomes, input_mods
 
-def corrupt_orig(data, num_corruptions, corruption_fraction):    
-    """
-    Stochastically drop KO's / modules from genomes
-    
-    Arguments:
-    data (df) -- train or test dataset
-    num_corruptions (int) -- number of corrupted outputs to produce per input genome
-    corruption_fraction (float) -- what % of KO's/mods to drop
-    
-    Returns:
-    out (tensor) -- training set with corrupted genomes and then uncorrupted genomes in each row
-    genome_idx (dict) -- maps genome idx in corrupt_train / corrupt_test to genome ID
-        E.g.: genome_idx[i] -> 'T012839'
-    """
-    
-    num_genomes = data.shape[0] # number of genomes in the train ds
-    out = np.zeros(shape=(num_genomes*num_corruptions,data.shape[1]*2))
-    
-    # Create dict that can trace each genome back to original genome index 
-    genome_idx = {}
-    genome_counter = 0
-    
-    print
-    
-    # Iterate through original genomes ---> produce corrupt versions 
-    for s in range(num_genomes):
-        # get indices of KO's present 
-        ko_idx = np.argwhere(data[s] == 1).tolist() #[0]
-        ko_idx = [item for sublist in ko_idx for item in sublist]
+def new_corrupt(BASE_DIR, train_data, train_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods):
+	"""
+	Generate new genome corruptions from scratch
+	
+	Arguments:
+		BASE_DIR (str) -- path to working directory
+		train_data (numpy.ndarray) -- training data. Rows are genomes, columns are genes/KOs. 1's denote presence of a gene in the genome, 0's denote absence
+		train_genomes (list) -- tnums of genomes in the training set
+		n_corrupt (int) -- number of corrupted version to make of each genome
+		tnum_to_tla (dict) -- for each genome, converts tnum to tla
+		tla_to_mod_to_kos (defaultdict of dicts) -- maps tla to series of dicts, keys are KEGG modules and values are lists of KOs in that module (e.g.: 'eun': {'M00001': ['K00845', etc]}, etc} etc})
+		all_kos (list) -- list of all KOs in the dataset
+		mod_to_ko_clean (dict )-- the functions of many modules can be "completed" by different sets of genes. Here we choose to represent each module by the most common set of genes. Dict maps each module (e.g.: 'K00001') to a list of genes (e.g.: ['K00845', ..., 'K00873'])
+		n_mods (int) -- maximum number of mods to keep per corrupted genome
+	
+	Returns:
+		corrupted_train (tensor) -- corrupted training data. Rows are genomes, columns are genes. 1 denotes gene encoded by genome, 0 denotes absence.
+		c_train_genomes (list) -- tnum corresponding to each row (genome) of corrupted_train
+		train_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_train_genomes)
+		corrupted_test (tensor) -- corrupted test data. Rows are genomes, columns are genes. 1 denotes gene encoded by genome, 0 denotes absence.
+		c_test_genomes (list) -- tnum corresponding to each row (genome) of corrupted_test
+		test_input_mods (list) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
+	"""
+	print ("Creating new corruptions")
+	print (str(n_corrupt),"corruptions per genome")
+	print ("With",str(n_mods),"modules as input per genome")
+	print ("Saved as",date_to_save)
 
-        uncorr_idx = [(i + data.shape[1]) for i in ko_idx]
-
-        # generate num_corruptions corrupted genomes from original genome
-        for i in range(num_corruptions):
-            # random sampling of gene idxs without replacement
-            keeper_idx = random.sample(ko_idx, int(len(ko_idx)*corruption_fraction))
-            # retain only keeper genes
-            out[genome_counter][keeper_idx] = 1
-            
-#            print(np.sum(out[genome_counter]))
-            if np.sum(out[genome_counter]) < 1: 
-                print("error", len(keeper_idx))
-                print("int(len(ko_idx)*corruption_fraction)",int(len(ko_idx)*corruption_fraction))
-                print("len(ko_idx)",len(ko_idx))
-                raise Exception()
-#                sys.exit(0)
-            
-            # Then add uncorrupted genome
-            out[genome_counter][uncorr_idx] = 1
-            genome_idx[genome_counter] = s
-            genome_counter += 1
-    
-    out = torch.FloatTensor(out)
-             
-    return out, genome_idx
-
-
-
-def get_n_corrupt(tnum_to_tla, train_genomes, mode):
-    from genome_embeddings import data_viz
-    train_genomes_tla = [tnum_to_tla[i] for i in train_genomes]
-    
-    pc_train_tax_dict, _ = data_viz.tax_distribution(train_genomes_tla, train_genomes_tla, mode)
-    
-    phylum_count = defaultdict(int)
-    for tla in pc_train_tax_dict:
-        phylum = pc_train_tax_dict[tla][1]
-        if phylum == "Proteobacteria":
-            phylum = pc_train_tax_dict[tla][2]
-        
-        phylum_count[phylum] += 1
-    
-    for tla in train_genomes_tla:
-        phylum = pc_train_tax_dict[tla][1]
-        if phylum == "Proteobacteria":
-            phylum = pc_train_tax_dict[tla][2]
-            
-        count = phylum_count[phylum]
-        
-        count_to_corrupt = {10: 5000, 100: 1000, 1000: 500, 10000: 100}
-        #count_to_corrupt = {10: 50, 100: 10, 1000: 5, 10000: 1}
-        
-        if count < 10:
-            n_corrupt = count_to_corrupt[10]
-        elif count < 100:
-            n_corrupt = count_to_corrupt[100]
-        elif count < 1000:
-            n_corrupt = count_to_corrupt[1000]        
-        else:
-            n_corrupt = count_to_corrupt[10000]
-        
-    return n_corrupt
-
-
-def corrupt2(train_data, train_genomes, tnum_to_tla, org_to_mod_to_kos, all_kos, mod_to_ko_clean, org_to_kos, mode, n_mods):
-    """
-    For each genome, keep the KO's in 1-10 modules. Everything else should be zeros
-    Note: creates corrupted + matching uncorrupted tensor of genomes, in that order
-    Note: only genomes with >= 1 module are included in the output
-    Note: uses "cleaned" modules from mod_to_ko_clean  
-        I.e. most common set of KOs per module, rather than 20 variants of each mod
-    
-    Arguments:
-    train_data (tensor) -- rows = uncorrupted genomes, columns = KOs
-    train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
-    n_corrupt (int) -- number of corrupted versions to make of each genome
-    tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
-    method (str) -- method for performing corruption, "v1" | "v2"
-    
-    Returns:
-    output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
-    c_train_genomes -- names of genomes in the order they appear in output
-    """
-        
-    output = [] 
-    c_train_genomes = []
-    n_kos_tot = train_data.shape[1]
-    input_mods = []
-    
-    line_counter = 0
-    for i, tnum in enumerate(train_genomes):
-        org = tnum_to_tla[tnum]
-        n_tot_mods = len(org_to_mod_to_kos[org]) # number of modules in the genome 
-        
-        n_corrupt = get_n_corrupt(tnum_to_tla, train_genomes, mode) # get number of corruptions to make per genome
-        n_corrupted = 0 # track how many have already been made
-        
-        uncorrupted = train_data[i]
-        while n_corrupted < n_corrupt: 
-            c_train_genomes.append(org)
-            
-            corrupted, in_mods = heart_of_corruption_v1(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods)
-
-            genome_out = np.concatenate((corrupted, uncorrupted), axis=None)
-            output.append(genome_out)
-            input_mods.append(in_mods)
-            line_counter += 1
-            n_corrupted += 1
-            
-    return torch.Tensor(output), c_train_genomes, input_mods
-
+	# Do corruptions from training and then test sets
+	corrupted_train, c_train_genomes, train_input_mods = corrupt.corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods)
+	corrupted_test, c_test_genomes, test_input_mods = corrupt.corrupt(test_data, test_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods)
+	
+	# Save!!!
+	torch.save(corrupted_train, BASE_DIR+"corrupted_train_"+date_to_save+".pt")
+	torch.save(c_train_genomes, BASE_DIR+"c_train_genomes_"+date_to_save+".pt")
+	torch.save(corrupted_test, BASE_DIR+"corrupted_test_"+date_to_save+".pt")
+	torch.save(c_test_genomes, BASE_DIR+"c_test_genomes_"+date_to_save+".pt")
+	torch.save(train_input_mods, BASE_DIR+"train_input_mods_"+date_to_save+".pt")
+	torch.save(test_input_mods, BASE_DIR+"test_input_mods_"+date_to_save+".pt")
+	
+	return corrupted_train, c_train_genomes, train_input_mods, corrupted_test, c_test_genomes, test_input_mods
+	
+def load_corrupt(BASE_DIR, date_to_load):
+	"""
+	Loads corrupted genome vectors from file
+	
+	Arguments:
+		BASE_DIR (str) -- path to working directory
+		date_to_load (str) -- name of file to load
+		
+	Returns:
+		corrupted_train (tensor) -- corrupted training data. Rows are genomes, columns are genes. 1 denotes gene encoded by genome, 0 denotes absence.
+		c_train_genomes (list) -- tnum corresponding to each row (genome) of corrupted_train
+		train_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_train_genomes)
+		corrupted_test (tensor) -- corrupted test data. Rows are genomes, columns are genes. 1 denotes gene encoded by genome, 0 denotes absence.
+		c_test_genomes (list) -- tnum corresponding to each row (genome) of corrupted_test
+		test_input_mods (list) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
+	"""
+	print("Loading corrupted genome vectors from "+date_to_load)
+	corrupted_train = torch.load(BASE_DIR+"corrupted_train_"+date_to_load+".pt")
+	c_train_genomes = torch.load(BASE_DIR+"c_train_genomes_"+date_to_load+".pt")
+	corrupted_test = torch.load(BASE_DIR+"corrupted_test_"+date_to_load+".pt")
+	c_test_genomes = torch.load(BASE_DIR+"c_test_genomes_"+date_to_load+".pt")
+	train_input_mods = torch.load(BASE_DIR+"train_input_mods_"+date_to_load+".pt")
+	test_input_mods = torch.load(BASE_DIR+"test_input_mods_"+date_to_load+".pt")
+	
+	return corrupted_train, c_train_genomes, train_input_mods, corrupted_test, c_test_genomes, test_input_mods
+	
