@@ -50,7 +50,7 @@ config = {'num_epochs': 10,
 
 # Perform hp tuning
 analysis = tune.run(
-    trainable.train_AE, 
+    trainable.train_VAE_with_tune, 
     name='vae'+date,
     config=config,
     verbose=2, 

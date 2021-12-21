@@ -1,10 +1,10 @@
 from collections import defaultdict
 from datetime import datetime
+import pickle
 import random
 import re
 
 import numpy as np
-import pickle
 import torch
 
 def balanced_split(f_test, final_genomes, taxid_to_tnum):
@@ -12,10 +12,10 @@ def balanced_split(f_test, final_genomes, taxid_to_tnum):
 	Create a train-test split that is phylogenetically balanced at the phylum level
 	
 	Arguments:
-	f_test (int) -- proportion allocated to test set (e.g.: 0.1 for 90% train, 10% test split)
+		f_test (int) -- proportion allocated to test set (e.g.: 0.1 for 90% train, 10% test split)
 	
 	Returns:
-	train_test (dict of lists) -- list of genomes (tnums) assigned to the respective keys 'train' or 'test
+		train_test (dict of lists) -- list of genomes (tnums) assigned to the respective keys 'train' or 'test
 	"""
 	# create dict mapping phyla to a list of genomes per phylum
 	phylum_to_tnum = defaultdict(list)
@@ -68,11 +68,13 @@ def genomes2include(path):
 	"""
 	Figure out which genomes I want to include in my dataset based on those in selected_kegg.txt
 	
-	Arguments: None
+	Arguments:
+		path -- path to 'selected_kegg.txt'
 	
 	Returns: 
-	tla_to_tnum (dict) -- converts three-letter abbreviations (e.g.: eco) to t-numbers (e.g.: T04989) 
-	keepers (list) -- list of t-numbers to keep (e.g.: T04989)
+		tla_to_tnum (dict) -- converts three-letter abbreviations (e.g.: eco) to t-numbers (e.g.: T04989) 
+		tnum_to_tla (dict) -- maps tnum to tla for each genome
+		keepers (list) -- list of t-numbers to keep (e.g.: T04989)
 	"""
 	
 	# Use phylogenetically thinned list in selected_genomes.txt AND filter out non-bacteria
@@ -109,16 +111,16 @@ def load_kos(tla_to_tnum, tnum_to_tla, tla_to_mod_to_kos, path):
 	Load mapping of genome to KOs encoded
 	
 	Arguments:
-	tla_to_tnum (dict) -- converts three-letter abbreviations (e.g.: eco) to t-numbers (e.g.: T04989) 
-	tla_to_mod_to_kos (dict of dict of list) -- 
-	mode () --
+		tla_to_tnum (dict) -- for each genome, maps from tla to tnum 
+		tnum_to_tla (dict) -- for each genome, maps from tnum to tla
+		tla_to_mod_to_kos (defaultdict of dicts) -- maps tla to series of dicts, keys are KEGG modules and values are lists of KOs in that module (e.g.: 'eun': {'M00001': ['K00845', etc]}, etc} etc})
+		path (str) -- path to working dir 
 	
 	Returns:
-	tnum_to_kos (dict of lists) -- for each organism, a list of KOs encoded by the genome 
-	n_kos_tot (int) -- number of KOs in tnum_to_kos
+		tnum_to_kos (dict of lists) -- for each organism, a list of KOs encoded by the genome 
+		n_kos_tot (int) -- number of KOs in tnum_to_kos
 	"""
 
-	#path = "/Users/natasha/Desktop/mcgill_postdoc/ncbi_genomes/kegg_dataset/annotations/annotations_list.txt"
 	master_file = open(path+"annotations/annotations_list.txt").readlines()
 	master_file = list(map(str.strip, master_file))
 	
@@ -169,10 +171,11 @@ def load_mods(path):
 	Load mapping of genomes to modules and KOs encoded per module
 
 	Arguments:
-	
+		path (str) -- path to working dir
+		
 	Returns:
-	tla_to_mod_to_kos (dict of dict of list) -- three letter genome ID (e.g.: "has") to modules endoded to list of genes per module
-	mod_sets (defaultdict of defaultdict of int) -- for each module, all alternative pathways and their counts 
+		tla_to_mod_to_kos (dict of dict of list) -- three letter genome ID (e.g.: "has") to modules endoded to list of genes per module
+		mod_sets (defaultdict of defaultdict of int) -- for each module, all alternative pathways and their counts 
 	"""
 	# Load mapping from organism (tla, e.g.: Pea) to complete modules encoded to KOs in each module
 	
@@ -197,18 +200,16 @@ def load_mods(path):
 	
 	return tla_to_mod_to_kos, mod_sets
 
-
-
 def make_tensor(tla_to_mod_to_kos, tnum_to_kos, n_kos_tot, tla_to_tnum, all_kos, save=False):
 	"""
 	Convert tnum_to_kos dict to a tensor
 	
 	Arguments: 
-	tla_to_mod_to_kos ()
+		tla_to_mod_to_kos (defaultdict of dicts) -- maps tla to series of dicts, keys are KEGG modules and values are lists of KOs in that module (e.g.: 'eun': {'M00001': ['K00845', etc]}, etc} etc})
 		
 	Returns:
-	data (tensor) -- rows are genomes, columns are KOs 
-	genome_order (list) -- in the same order as data tensor, list of genomes IDs
+		data (tensor) -- rows are genomes, columns are KOs 
+		genome_order (list) -- in the same order as data tensor, list of genomes IDs
 	"""
 	
 	n_genomes = len(tla_to_mod_to_kos)
@@ -267,7 +268,7 @@ def prep_data(list_genomes, all_kos, tnum_to_kos, mode):
 		mode (str) -- used to save data to file ["test" | "train"] 
 	
 	Returns:
-		data (np array) -- rows = genomes, columns = KOs, 1 = KO present in genome, 0 = KO absent in genome
+		data (numpy.ndarray) -- rows = genomes, columns = KOs, 1 = KO present in genome, 0 = KO absent in genome
 	"""
 	
 	#assert (mode == "test" or mode == "train")
@@ -285,10 +286,16 @@ def prep_data(list_genomes, all_kos, tnum_to_kos, mode):
 
 	return data
 
-
 def clean_kos(mod_sets):
-	# Select most "popular" version of each module, store it in dict: mod_to_ko_clean
-	# mod_to_ko_clean['M00003'] = ['K00001', 'K00002', etc] <- most common variant of M00003
+	"""
+	Creates dict mapping modules the most common version (set of encoding genes) therefore
+	
+	Arguments:
+		mod_sets (defaultdict) -- raw data from KEGG defining which KOs are in each module
+	
+	Returns:
+		mod_to_ko_clean (dict )-- the functions of many modules can be "completed" by different sets of genes. Here we choose to represent each module by the most common set of genes. Dict maps each module (e.g.: 'K00001') to a list of genes (e.g.: ['K00845', ..., 'K00873'])
+	"""
 	mod_to_ko_clean = {}
 	for mod in mod_sets:
 		max_count = 0
@@ -299,7 +306,6 @@ def clean_kos(mod_sets):
 				max_path = ko_str.split("_")
 		mod_to_ko_clean[mod] = max_path
 	return mod_to_ko_clean
-
 
 # Are input mods in the output?
 # input: test_input_mods
@@ -409,7 +415,7 @@ def taxid_to_tax(DATA_FP, taxid_to_tnum, date):
 def phylogenetic_thin(tnum_to_tax):
 	"""
 	Arguments:
-	tnum_to_tax (dict of lists) -- maps tnum to taxonomy in form of [Domain, Phylum, Class, ..., Species]
+	tnum_to_tax (dict of lists) -- maps tnum to taxonomy in form of [domain, phylum, ..., species]
 	
 	Returns:
 	final_genomes (defaultdict) -- keys are genomes to keep for analysis
@@ -883,7 +889,7 @@ def load_data(BASE_DIR, DATA_DIR):
 	train_genomes = torch.load(BASE_DIR+"kegg_v2_train_genomes_2020-09-29.pt")
 	test_genomes = torch.load(BASE_DIR+"kegg_v2_test_genomes_2020-09-29.pt")
 	
-	return tla_to_mod_to_kos, mod_sets, tla_to_tnum, tnum_to_tla, keepers, tnum_to_kos, n_kos_tot, all_kos, mod_to_ko_clean, all_kos, tla_to_mod_to_kos, train_data, test_data, train_genomes, test_genomes
+	return tla_to_mod_to_kos, mod_sets, tla_to_tnum, tnum_to_tla, keepers, tnum_to_kos, n_kos_tot, all_kos, mod_to_ko_clean, all_kos, train_data, test_data, train_genomes, test_genomes
 	
 def helpful_data_stats(train_data, test_data):
 	"""
@@ -920,7 +926,7 @@ def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods
 		c_train_genomes (list) -- tnum corresponding to each row (genome) of corrupted_train
 		train_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_train_genomes)
 		c_test_genomes (list) -- -- tnum corresponding to each row (genome) of corrupted_train
-		train_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
+		test_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
 		 DATA_DIR (str) -- path to dir containing data
 		 masterfile (str) -- path to file listing all downloaded files 'aaa_info.txt', etc. These can be parsed to yield taxonomic information.
 		 ncbi_lineages_path (str) -- path to ncbi_lineages.csv file
@@ -977,3 +983,28 @@ def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods
 	test_tax_dict = final_sets(c_test_genomes, taxid_to_tla)
 	
 	return train_tax_dict, test_tax_dict
+
+def make_tnum_to_tax(train_tax_dict, test_tax_dict, tla_to_tnum):
+    """
+    Make a dict that maps tnums to tax [domain, ..., species]
+    
+    Arguments:
+        train_tax_dict (dict) -- for each genome in the training set, maps tla to tax [domain, ..., species]
+        test_tax_dict (dict) -- for each genome in the test set, maps tla to tax [domain, ..., species]
+        tla_to_tnum (dict) -- maps tla to tnum
+    
+    Returns:
+        tnum_to_tax (dict) -- maps tnums to tax [domain, ..., species]
+    """
+    tnum_to_tax = {}
+    
+    for tla in train_tax_dict:
+        tnum = tla_to_tnum[tla]
+        tnum_to_tax[tnum] = train_tax_dict[tla]
+        
+    for tla in test_tax_dict:
+        tnum = tla_to_tnum[tla]
+        tnum_to_tax[tnum] = test_tax_dict[tla]
+    
+    return tnum_to_tax
+    

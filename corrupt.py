@@ -10,11 +10,11 @@ def heart_of_corruption(org_to_mod_to_kos, org, n_kos_tot, all_kos, n_mods):
 	For each genome vector, keep the KO's in n_mods modules. All other bits will be converted to zeros.
 	
 	Arguments:
-	org (str) -- tla for genome (e.g.: "aha")
-	n_max (int) -- the maximum number of mods to select for corrupted version of any given genome
+		org (str) -- tla for genome (e.g.: "aha")
+		n_max (int) -- the maximum number of mods to select for corrupted version of any given genome
 	
 	Returns:
-	corrupted (np array) -- vector representing corrupted version of a genome
+		corrupted (np array) -- vector representing corrupted version of a genome
 	"""
 	keeps = random.sample(list(org_to_mod_to_kos[org].keys()), n_mods)			
 	idxs = []
@@ -39,14 +39,14 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
 		I.e. most common set of KOs per module, rather than 20 variants of each mod
 	
 	Arguments:
-	train_data (tensor) -- rows = uncorrupted genomes, columns = KOs
-	train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
-	n_corrupt (int) -- number of corrupted versions to make of each genome
-	tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
+		train_data (tensor) -- rows = uncorrupted genomes, columns = KOs
+		train_genomes (list) -- names of genomes in train_data (e.g.: "T03060")
+		n_corrupt (int) -- number of corrupted versions to make of each genome
+		tnum_to_tla (dict) -- maps tnum (e.g.: "T03060") to tla (e.g.: "Red")
 	
 	Returns:
-	output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
-	c_train_genomes (list) -- names of genomes in the order they appear in output
+		output (tensor) -- corrupted + uncorrupted genomes (each genome's two versions are concatenated in a row)
+		c_train_genomes (list) -- names of genomes in the order they appear in output
 	"""
 		
 	output = [] 
