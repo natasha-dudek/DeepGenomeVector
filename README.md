@@ -1,4 +1,4 @@
-# DeepGenome
+# DeepGenomeVector
 
 This repository contains a python implementation (tested on version 3.7.6) for the DeepGenome model described in: 
 
