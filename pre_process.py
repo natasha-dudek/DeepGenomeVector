@@ -7,6 +7,8 @@ import re
 import numpy as np
 import torch
 
+from genome_embeddings import config
+
 def balanced_split(f_test, final_genomes, taxid_to_tnum):
 	"""
 	Create a train-test split that is phylogenetically balanced at the phylum level
@@ -121,7 +123,7 @@ def load_kos(tla_to_tnum, tnum_to_tla, tla_to_mod_to_kos, path):
 		n_kos_tot (int) -- number of KOs in tnum_to_kos
 	"""
 
-	master_file = open(path+"annotations/annotations_list.txt").readlines()
+	master_file = open(config.DATA_ROOT+config.DL_ANNOTATIONS_PATH).readlines()
 	master_file = list(map(str.strip, master_file))
 	
 	### Create dict mapping genomes to encoded KOs
@@ -129,7 +131,7 @@ def load_kos(tla_to_tnum, tnum_to_tla, tla_to_mod_to_kos, path):
 	# ko = list of all KOs annotated in genome
 	tnum_to_kos = {}
 	for i in master_file:
-		file = open(path+'annotations/'+i).readlines()
+		file = open(config.DATA_ROOT+config.ANNOTATIONS_PATH+i).readlines()
 		file = list(map(str.strip, file))
 	   
 		tla = i.split("_")[0]
@@ -853,13 +855,12 @@ def get_tax():
 	        tnum_to_tax[tnum] = lin[1:8] # domain - species
 	return (tnum_to_taxid, tnum_to_tax)	
 	
-def load_data(BASE_DIR, DATA_DIR):
+def load_data(DATA_DIR):
 	"""
 	Loads data necessary for project
 	
 	Arguments:
-		BASE_DIR (str) -- path to working dir
-		DATA_DIR (str) -- path to KEGG data
+		DATA_DIR (str) -- path to KEGG and other data
 	
 	Returns:
 		tla_to_mod_to_kos (defaultdict of dicts) -- maps tla to series of dicts, keys are KEGG modules and values are lists of KOs in that module (e.g.: 'eun': {'M00001': ['K00845', etc]}, etc} etc})
@@ -876,18 +877,17 @@ def load_data(BASE_DIR, DATA_DIR):
 		train_genomes (list) -- tnums of genomes in the training set
 		test_genomes (list) -- tnums of genomes in the test set
 	"""
-	tla_to_mod_to_kos, mod_sets = load_mods(DATA_DIR) # path to dir with tla_to_mod_to_kos.pkl
+	tla_to_mod_to_kos, mod_sets = load_mods(DATA_DIR) 
 	tla_to_tnum, tnum_to_tla, keepers = genomes2include(DATA_DIR)
 	tnum_to_kos, n_kos_tot, all_kos = load_kos(tla_to_tnum, tnum_to_tla, tla_to_mod_to_kos, DATA_DIR)
 	mod_to_kos = create_mod_to_kos(tla_to_mod_to_kos)
 	mod_to_ko_clean = clean_kos(mod_sets)
 	
-	all_kos = torch.load(BASE_DIR+"all_kos_2020-09-29.pt")
-	tla_to_mod_to_kos = torch.load(BASE_DIR+"tla_to_mod_to_kos_2020-09-29.pt")
-	train_data = torch.load(BASE_DIR+"kegg_v2_train_2020-09-29.pt")
-	test_data = torch.load(BASE_DIR+"kegg_v2_test_2020-09-29.pt")
-	train_genomes = torch.load(BASE_DIR+"kegg_v2_train_genomes_2020-09-29.pt")
-	test_genomes = torch.load(BASE_DIR+"kegg_v2_test_genomes_2020-09-29.pt")
+	all_kos = torch.load(DATA_DIR+"all_kos_2020-09-29.pt")
+	train_data = torch.load(DATA_DIR+"kegg_train_data_2020-09-29.pt")
+	test_data = torch.load(DATA_DIR+"kegg_test_data_2020-09-29.pt")
+	train_genomes = torch.load(DATA_DIR+"kegg_train_genomes_list_2020-09-29.pt")
+	test_genomes = torch.load(DATA_DIR+"kegg_test_genomes_list_2020-09-29.pt")
 	
 	return tla_to_mod_to_kos, mod_sets, tla_to_tnum, tnum_to_tla, keepers, tnum_to_kos, n_kos_tot, all_kos, mod_to_ko_clean, all_kos, train_data, test_data, train_genomes, test_genomes
 	
@@ -918,7 +918,7 @@ def datenow():
 	date_list = [now.year, now.month, now.day, now.hour, now.minute, now.second]
 	return '-'.join([str(i) for i in date_list])	
 
-def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods, DATA_DIR, masterfile, ncbi_lineages_path, path_to_info_files):
+def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods):
 	"""
 	Create dict that maps each tla to its taxonomic ID -- 'tla': ['domain', 'phylum', ..., 'species']
 	
@@ -927,10 +927,6 @@ def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods
 		train_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_train_genomes)
 		c_test_genomes (list) -- -- tnum corresponding to each row (genome) of corrupted_train
 		test_input_mods (list of lists) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
-		 DATA_DIR (str) -- path to dir containing data
-		 masterfile (str) -- path to file listing all downloaded files 'aaa_info.txt', etc. These can be parsed to yield taxonomic information.
-		 ncbi_lineages_path (str) -- path to ncbi_lineages.csv file
-		 path_to_info_files (str) -- path to info files containing NCBI taxids
 	
 	Returns:
 		train_tax_dict (dict) -- maps each training set tla to ['domain', 'phylum', ..., 'species']
@@ -938,16 +934,16 @@ def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods
 	"""
 	
 	# iterate through info files to extract taxids
-	master_file = open(DATA_DIR+masterfile).readlines()
+	master_file = open(config.DATA_ROOT+config.KEGG_DL_PATH).readlines()
 	master_file = list(map(str.strip, master_file))
 	
 	taxid_to_tla = {}
 	
 	for i in master_file:
-		file = open(DATA_DIR+path_to_info_files+i).readlines()
+		file = open(config.DATA_ROOT+config.INFO_PATH+i).readlines()
 		file = map(str.strip, file)
 	
-		threeLA = i.split("_")[0]
+		threeLA = i.split("_")[0] # short for KEGG's 'three letter abbreviation', e.g.: rav for T03876 
 	
 		for s in file:
 			if "<b>Taxonomy</b></td><td>TAX:" in s:
@@ -957,7 +953,7 @@ def tax_dicts(c_train_genomes, train_input_mods, c_test_genomes, test_input_mods
 	
 	# match taxids to ncbi lineages
 	def final_sets(c_genomes, taxid_to_tla): # c_genomes is either c_train_genomes or c_test_genomes
-		tax_path = open(DATA_DIR+"ncbi_lineages_2020-05-04.csv").readlines()
+		tax_path = open(config.DATA_ROOT+config.NCBI_LINEAGES_PATH).readlines()
 		tax_path = map(str.strip, tax_path) 
 	
 		final_train_tlas = set(list(c_genomes))

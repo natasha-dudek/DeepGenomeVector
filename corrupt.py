@@ -74,12 +74,12 @@ def corrupt(train_data, train_genomes, n_corrupt, tnum_to_tla, org_to_mod_to_kos
 			
 	return torch.Tensor(output), c_train_genomes, input_mods
 
-def new_corrupt(BASE_DIR, train_data, train_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods):
+def new_corrupt(OUT_DIR, train_data, train_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods):
 	"""
 	Generate new genome corruptions from scratch
 	
 	Arguments:
-		BASE_DIR (str) -- path to working directory
+		OUT_DIR (str) -- path to working directory
 		train_data (numpy.ndarray) -- training data. Rows are genomes, columns are genes/KOs. 1's denote presence of a gene in the genome, 0's denote absence
 		train_genomes (list) -- tnums of genomes in the training set
 		n_corrupt (int) -- number of corrupted version to make of each genome
@@ -107,21 +107,21 @@ def new_corrupt(BASE_DIR, train_data, train_genomes, n_corrupt, tnum_to_tla, tla
 	corrupted_test, c_test_genomes, test_input_mods = corrupt.corrupt(test_data, test_genomes, n_corrupt, tnum_to_tla, tla_to_mod_to_kos, all_kos, mod_to_ko_clean, n_mods)
 	
 	# Save!!!
-	torch.save(corrupted_train, BASE_DIR+"corrupted_train_"+date_to_save+".pt")
-	torch.save(c_train_genomes, BASE_DIR+"c_train_genomes_"+date_to_save+".pt")
-	torch.save(corrupted_test, BASE_DIR+"corrupted_test_"+date_to_save+".pt")
-	torch.save(c_test_genomes, BASE_DIR+"c_test_genomes_"+date_to_save+".pt")
-	torch.save(train_input_mods, BASE_DIR+"train_input_mods_"+date_to_save+".pt")
-	torch.save(test_input_mods, BASE_DIR+"test_input_mods_"+date_to_save+".pt")
+	torch.save(corrupted_train, OUT_DIR+"corrupted_train_"+date_to_save+".pt")
+	torch.save(c_train_genomes, OUT_DIR+"c_train_genomes_"+date_to_save+".pt")
+	torch.save(corrupted_test, OUT_DIR+"corrupted_test_"+date_to_save+".pt")
+	torch.save(c_test_genomes, OUT_DIR+"c_test_genomes_"+date_to_save+".pt")
+	torch.save(train_input_mods, OUT_DIR+"train_input_mods_"+date_to_save+".pt")
+	torch.save(test_input_mods, OUT_DIR+"test_input_mods_"+date_to_save+".pt")
 	
 	return corrupted_train, c_train_genomes, train_input_mods, corrupted_test, c_test_genomes, test_input_mods
 	
-def load_corrupt(BASE_DIR, date_to_load):
+def load_corrupt(OUT_DIR, date_to_load):
 	"""
 	Loads corrupted genome vectors from file
 	
 	Arguments:
-		BASE_DIR (str) -- path to working directory
+		OUT_DIR (str) -- path to working directory
 		date_to_load (str) -- name of file to load
 		
 	Returns:
@@ -133,12 +133,12 @@ def load_corrupt(BASE_DIR, date_to_load):
 		test_input_mods (list) -- lists of the mods that were retained during the corruption process (in same order as genome rows / c_test_genomes)
 	"""
 	print("Loading corrupted genome vectors from "+date_to_load)
-	corrupted_train = torch.load(BASE_DIR+"corrupted_train_"+date_to_load+".pt")
-	c_train_genomes = torch.load(BASE_DIR+"c_train_genomes_"+date_to_load+".pt")
-	corrupted_test = torch.load(BASE_DIR+"corrupted_test_"+date_to_load+".pt")
-	c_test_genomes = torch.load(BASE_DIR+"c_test_genomes_"+date_to_load+".pt")
-	train_input_mods = torch.load(BASE_DIR+"train_input_mods_"+date_to_load+".pt")
-	test_input_mods = torch.load(BASE_DIR+"test_input_mods_"+date_to_load+".pt")
+	corrupted_train = torch.load(OUT_DIR+"corrupted_train_"+date_to_load+".pt")
+	c_train_genomes = torch.load(OUT_DIR+"c_train_genomes_"+date_to_load+".pt")
+	corrupted_test = torch.load(OUT_DIR+"corrupted_test_"+date_to_load+".pt")
+	c_test_genomes = torch.load(OUT_DIR+"c_test_genomes_"+date_to_load+".pt")
+	train_input_mods = torch.load(OUT_DIR+"train_input_mods_"+date_to_load+".pt")
+	test_input_mods = torch.load(OUT_DIR+"test_input_mods_"+date_to_load+".pt")
 	
 	return corrupted_train, c_train_genomes, train_input_mods, corrupted_test, c_test_genomes, test_input_mods
 	

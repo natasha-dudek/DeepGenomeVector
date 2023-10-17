@@ -145,7 +145,7 @@ def plot_tax_dist(c_train_genomes, c_test_genomes, train_tax_dict, test_tax_dict
 	width = 0.35  # the width of the bars
 	
 	fig, ax = plt.subplots()
-	rects1 = ax.bar(x - width/2, train_dist3, width, label='Train (n='+n_train+')', color='#0066ff')
+	rects1 = ax.bar(x - width/2, train_dist3, width, label='Train (n='+n_train+')', color='#1f77b4')
 	rects2 = ax.bar(x + width/2, test_dist3, width, label='Test (n='+n_test+')', color='#9966ff')
 	plt.semilogy()
 	
@@ -178,7 +178,8 @@ def mods_by_genomes(tla_to_mod_to_kos):
 	plt.xlabel("Number of modules per genome")
 	plt.ylabel("Frequency")
 	plt.title("Distribution of the # of modules (n="+str(n_mods)+") per genome (n="+str(n_genomes)+")")
-
+	plt.xlim(left=0)
+	
 	return fig
 
 def variants_of_mod(mod, mod_sets, tla_to_mod_to_kos):
@@ -203,19 +204,18 @@ def variants_of_mod(mod, mod_sets, tla_to_mod_to_kos):
 	plt.title("Variants of module "+mod)
 	plt.xlabel("Variant (n="+str(len(mod_sets[mod].values()))+" )")
 	plt.ylabel("Count across all genomes (n="+str(len(tla_to_mod_to_kos))+")")
-	
+	plt.xlim(left=0) 
 	print('The most common variant of module '+mod+' occurs in %s genomes. There are a total of %s module variants.' % (max(mod_sets[mod].values()), len(mod_set)))
 
 	return fig
 
-def kos_per_genome(BASE_DIR, tnum_to_kos, train_genomes, test_genomes):
+def kos_per_genome(tnum_to_kos, train_genomes, test_genomes):
 	"""
 	Plot the number of KOs encoded by each genome in the full dataset and print summary stats
 	
 	Note: this includes genomes excluded from the final dataset
 	
 	Arguments:
-		BASE_DIR (str) -- path to working dir
 		tnum_to_kos (dict) -- maps tnums to KOs encoded by that genome
 		train_genomes (list) -- tnums of genomes in the training set
 		test_genomes (list) -- tnums of genomes in the test set
@@ -228,8 +228,7 @@ def kos_per_genome(BASE_DIR, tnum_to_kos, train_genomes, test_genomes):
 	plt.xlabel("Number of KOs per genome")
 	plt.ylabel("Frequency")
 	plt.title("Histogram of KOs per genome")
-	plt.savefig(BASE_DIR+"fig.png")
-	
+	plt.xlim(left=0)
 	lens = [len(tnum_to_kos[i]) for i in tnum_to_kos if i in train_genomes or i in test_genomes]
 	print("Median:",np.median(lens), "Min:",min(lens), "Max:",max(lens))
 
@@ -259,6 +258,7 @@ def distrib_num_genomes_with_mod(tla_to_mod_to_kos):
 	plt.ylabel("Frequency")
 	plt.title("Distribution of the # of genomes (n="+str(org_count)+") encoding each module (n="+str(len(mods_count))+")")
 	plt.yscale('log')
+	plt.xlim(left=0)
 	
 	print("Number of mods encoded in only one genome:",list(mods_count.values()).count(1))
 	print("Max number of genomes encoding a single mod", max(list(mods_count.values())))
@@ -307,6 +307,7 @@ def perc_genes_in_mods(tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum, all_kos):
 	plt.xlabel("Percent of KOs contributing to modules")
 	plt.ylabel("Frequency")
 	plt.title("Distribution of the % of KOs (n="+str(len(all_kos))+") represented by modules (n="+str(n_mods)+") per genome (n="+str(len(tla_to_mod_to_kos))+")")
+	plt.xlim(left=0)
 	
 	# Calculate some summary statistics
 	kos_in_mods = []
@@ -349,13 +350,18 @@ def genes_per_genome(c_train_genomes, c_test_genomes, tnum_to_kos, tla_to_tnum):
 	
 	# Plot the number of KOs encoded by each genome
 	fig, ax = plt.subplots()
-	plt.hist(train_lens, 50, color='#3385ff')
+	plt.hist(train_lens, 50, color='#1f77b4')
 	plt.hist(test_lens, 50, color='#bb99ff')
 	ax.legend(['Train', 'Test'])
 	plt.xlabel("# annotated genes / genome")
 	plt.ylabel("Count")
 	plt.ylim(0,125)
 	plt.xlim(min(train_lens),max(train_lens)+10)
+	
+	all_lens = train_lens+test_lens
+	print("Min # genes:",min(all_lens))
+	print("Median # genes:",np.median(all_lens))
+	print("Max # genes:",max(all_lens))
 	
 	return fig
 	
@@ -379,5 +385,5 @@ def mods_per_train_genome(tla_to_mod_to_kos, c_train_genomes):
 	plt.hist(mods_count.values())
 	plt.xlabel('Number of modules')
 	plt.ylabel('Number of genomes')
-	
+	plt.xlim(left=0)
 	return fig

@@ -15,13 +15,15 @@ from scipy import stats
 import seaborn as sns
 import sklearn as sk
 from sklearn.decomposition import PCA
-from sklearn.metrics import accuracy_score, auc, confusion_matrix, hamming_loss, roc_curve
+from sklearn.exceptions import UndefinedMetricWarning
+from sklearn.metrics import accuracy_score, auc, confusion_matrix, hamming_loss, roc_curve, roc_auc_score
 from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.preprocessing import Binarizer
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import torch
+import warnings
 
-from genome_embeddings import pre_process
+from genome_embeddings import config, pre_process
 
 def eval_binarize(pred, replacement_threshold):
 	"""
@@ -69,7 +71,7 @@ def confusion(uncorrupted, binary_pred):
 	p_fps = round(sum(fps)/total*100,2)
 	p_fns = round(sum(fns)/total*100,2)
 	p_tps = round(sum(tps)/total*100,2)
-	print('The percentage of TNs, FPs, FNs, and TPs, respectively, is:',p_tns, p_fps, p_fns, p_tps)	
+	print('The percentage of TNs, FPs, FNs, and TPs, respectively, is:',p_tns,"(%)", p_fps,"(%)", p_fns, "(%)",p_tps,"(%)")	
 	return tns, fps, fns, tps
 
 def kld_vs_bce(kld, bce):
@@ -246,18 +248,19 @@ def baseline1(corrupted_train, tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum, c_tr
 		baseline1 (tensor) -- baseline1 predictions. Rows are genomes, columns are genes. 1's denote a gene is encoded, 0 denotes that it is not
 	"""
 	# Use training set to get stats about gene count dist.
-	def gene_dist(tla_to_mod_to_kos, tla_to_kos, tla_to_tnum, c_train_genomes):
+	def gene_dist(tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum, c_train_genomes):
 		gene_counts = []
 		for org in tla_to_mod_to_kos:
 			tnum = tla_to_tnum[org]
-			if org in c_train_genomes and len(tla_to_mod_to_kos[org]) >= 10 and len(tla_to_kos[tnum]) >= 400: # make sure org is in training set, not test
-				if len(tla_to_kos[tnum]) < 10:
+			if org in c_train_genomes and len(tla_to_mod_to_kos[org]) >= 10 and len(tnum_to_kos[tnum]) >= 400: # make sure org is in training set, not test
+				if len(tnum_to_kos[tnum]) < 10:
 					print()
-					print (tnum, len(tla_to_kos[tnum]))
+					print (tnum, len(tnum_to_kos[tnum]))
 					print(len(tla_to_mod_to_kos[org]))
-				gene_counts.append(len(tla_to_kos[tnum]))
+				gene_counts.append(len(tnum_to_kos[tnum]))
 		return gene_counts
-	gene_counts = gene_dist(tla_to_mod_to_kos, tla_to_kos, tla_to_tnum, c_train_genomes)
+		
+	gene_counts = gene_dist(tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum, c_train_genomes)
 
 	n_features = int(corrupted_test.shape[1]/2)
 	baseline1 = torch.zeros_like(corrupted_test)
@@ -295,32 +298,33 @@ def baseline2(corrupted_train, tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum, c_tr
 		baseline2 (tensor) -- baseline2 predictions. Rows are genomes, columns are genes. 1's denote a gene is encoded, 0 denotes that it is not
 	"""
 
-	n_features = int(uncorrupted_train.shape[1]/2)
-	# Use training set to calculate stats about prob bits being on
-	uncorrupted = corrupted_train[:,n_features:] # uncorrupted
-	per_colum = torch.sum(uncorrupted, dim=0) # sum of each column
+	n_features = int(corrupted_train.shape[1]/2)
+	# Use training set to calculate stats about probability of genes/bits being on
+	uncorrupted = torch.Tensor(corrupted_train[:,n_features:]) 
+	per_colum = torch.sum(uncorrupted, dim=0) 
 	highest_prob = list(torch.argsort(per_colum, descending=True).numpy())
 	
-	def gene_dist(tla_to_mod_to_kos, tla_to_kos, tla_to_tnum):
+	# count the number of genes / bits on per real (uncorrupted) genome vector from the training set
+	def gene_dist(tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum):
 		gene_counts = []
 		for org in tla_to_mod_to_kos:
 			tnum = tla_to_tnum[org]
-			if org in c_train_genomes and len(tla_to_mod_to_kos[org]) >= 10 and len(tla_to_kos[tnum]) >= 400:
-				if len(tla_to_kos[tnum]) < 10:
+			if org in c_train_genomes and len(tla_to_mod_to_kos[org]) >= 10 and len(tnum_to_kos[tnum]) >= 400:
+				if len(tnum_to_kos[tnum]) < 10:
 					print()
-					print (tnum, len(tla_to_kos[tnum]))
+					print (tnum, len(tnum_to_kos[tnum]))
 					print(len(tla_to_mod_to_kos[org]))
-				gene_counts.append(len(tla_to_kos[tnum]))
+				gene_counts.append(len(tnum_to_kos[tnum]))
 		return gene_counts
-	
-	gene_counts = gene_dist(tla_to_mod_to_kos, tla_to_kos, tla_to_tnum)
-	
-	baseline2 = torch.zeros_like(uncorrupted)
+	gene_counts = gene_dist(tla_to_mod_to_kos, tnum_to_kos, tla_to_tnum)
+
+	# Using the corrupted test set as input to the baseline model, create predictions of genome vectors	
+	baseline2 = torch.zeros_like(corrupted_test)
 	
 	for i in range(baseline2.shape[0]):
 		# determine how many genes we want to be on
 		n_on = random.choice(gene_counts) 
-		# how many are already on?
+		# how many are already on in the input fed to the baseline model?
 		already_on = [int(s) for s in (corrupted_test[i,:n_features] == 1).nonzero()]
 		# remove already_on indices from highest_prob list, since they can't be turned on twice
 		for s in already_on:
@@ -359,7 +363,7 @@ def baseline4(corrupted_train, corrupted_test, tla_to_tnum, tnum_to_kos, c_train
 	tla_size = []
 	for tla in unique_train:
 		tnum = tla_to_tnum[tla]
-		tla_size.append([tla, len(tla_to_kos[tnum])])
+		tla_size.append([tla, len(tnum_to_kos[tnum])])
 	sorted_tla_size = sorted(tla_size, key=lambda x: x[1], reverse=False)
 	smallest_tla = sorted_tla_size[0][0] # tla = 'hed'
 	print("smallest_tla",smallest_tla)
@@ -393,7 +397,7 @@ def baseline5(corrupted_train, corrupted_test, tla_to_tnum, tnum_to_kos, c_train
 	tla_size = []
 	for tla in unique_train:
 		tnum = tla_to_tnum[tla]
-		tla_size.append([tla, len(tla_to_kos[tnum])])
+		tla_size.append([tla, len(tnum_to_kos[tnum])])
 	sorted_tla_size = sorted(tla_size, key=lambda x: x[1], reverse=True)
 	largest_tla = sorted_tla_size[0][0] # tla = hed
 	print("largest_tla",largest_tla)	# row index of smallest genome in train set
@@ -405,13 +409,39 @@ def baseline5(corrupted_train, corrupted_test, tla_to_tnum, tnum_to_kos, c_train
 	
 	return baseline5.long(), largest_tla
 
-def compare_in_n_out(binary_pred, corrupted):
+
+def generated_inputs_to_binary(generated_inputs, all_kos):
+	"""
+	Take list of KOs used as input to VAE to generate new genome vector, convert to binary matrix matching order of all_kos
+	
+	Arguments:
+		generated_inputs (dict) -- for each genome index, a list of lists. The first list is the modules that were used as inputs to the VAE, the second is the list of KOs that encode those modules
+		all_kos (list) -- list of all KOs in the dataset
+
+	Returns:
+		generated_inputs_binary -- for each generated genome, the corrupted data that was used as input to the model to make predictions; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
+	"""
+	generated_inputs_binary = []
+	
+	for i in range(len(generated_inputs)):
+	    out = []
+	    for ko in all_kos:
+	        if ko in generated_inputs[i][1]:
+	            out.append(1)
+	        else:
+	            out.append(0)
+	    generated_inputs_binary.append(out)
+	    
+	return torch.Tensor(generated_inputs_binary)
+
+
+def compare_in_n_out(binary_pred, generated_inputs_binary):
 	"""
 	Plot histogram showing how often genes in the VAE input are also in the reconstruction / output
 	
 	Arguments:
 		binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
-		corrupted (tensor) -- corrupted data; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
+		generated_inputs_binary (tensor) -- for each generated genome, the corrupted data that was used as input to the model to make predictions; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
 		
 	Returns:
 		matplotlib.Figure
@@ -419,18 +449,19 @@ def compare_in_n_out(binary_pred, corrupted):
 	out = {}
 	for i, pred_row in enumerate(binary_pred):
 		# what KOs were input?
-		corrupt_row = corrupted[i,:]
+		corrupt_row = generated_inputs_binary[i,:]
 		num_in = int(torch.sum(corrupt_row))
 		# How many of the genes in the input are also in the output
 		num_out = int(torch.sum(torch.mul(corrupt_row, pred_row)))
 		out[i] = [num_out, num_in, float(num_out/num_in*100)]
 
 	perc_out = [int(out[i][2]) for i in out]
-	
-	fig = fig, ax = plt.subplots()
-	plt.hist(perc_out, bins=50)
-	plt.xlabel('Percent of input genes in output')
-	plt.ylabel('Count')
+#	
+#	fig = fig, ax = plt.subplots()
+#	plt.hist(perc_out, bins=50)
+#	plt.xlabel('Percent of input genes in output')
+#	plt.ylabel('Count')
+#	plt.xlim(0,105)
 		
 	count_hund = 0
 	count_ninety = 0
@@ -442,7 +473,6 @@ def compare_in_n_out(binary_pred, corrupted):
 	print("There are",count_hund,"instance of inputs being 100% present in output")
 	print("This is out of",total,"instances or",str(round(count_hund/total*100, 2))+"% of cases")
 	print("There are",count_ninety,"instance of inputs being >=90% present in output ("+str(round(count_ninety/total*100, 2))+"%)")	
-	return fig
 
 def best_med_worst(f1s, c_test_genomes, tla_to_tnum):
 	"""
@@ -499,6 +529,7 @@ def test_f1s(uncorrupted, binary_pred):
 	plt.hist(f1s)
 	plt.xlabel('F1 score')
 	plt.ylabel('Count')
+	ax.set_xlim(right=1)
 	
 	return f1s, fig
 
@@ -590,7 +621,7 @@ def plot_count_vs_f1s(train_phyla, test_phyla):
 	plt.xlabel("Number of genomes in train set")
 	plt.ylabel("F1 score on test set")
 	plt.xscale('log')
-	
+
 	return fig
 
 def ngenesUncorrupted_vs_f1(uncorrupted_test, f1s, ax=None):
@@ -608,13 +639,15 @@ def ngenesUncorrupted_vs_f1(uncorrupted_test, f1s, ax=None):
 	n_genes_uncorrupted = torch.sum(uncorrupted_test, 1).numpy().tolist() # get sum of each row
 	
 	if ax is None:
-		fig = plt.figure()
-		ax = fig.get_axes()[0]
+		fig, ax = plt.subplots()
+		#ax = fig.get_axes()[0]
 	else:
 		fig = None
 	ax.scatter(n_genes_uncorrupted, f1s, marker='.', s = 1)
 	ax.set_xlabel("# genes in uncorrupted genome")
 	ax.set_ylabel("F1 score")
+	ax.set_ylim(0,1)
+	
 	return fig
 
 def ngenesCorrupted_vs_f1(corrupted_test, f1s):
@@ -656,10 +689,11 @@ def plot_train_count_hist(train_input_mods):
 	plt.hist(train_out.values())
 	plt.xlabel('# times mods are used in a corrupted genome')
 	plt.ylabel('Count')	
+	ax.set_xlim(left=0)
 	
-	return fig
+	return fig, train_out
 
-def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y_probas):
+def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y_probas, batch_size):
 	"""
 	Plots two learning curves and an ROC curve -- i.e. a pretty figure for the manuscript
 	
@@ -676,31 +710,47 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	"""
 	plt.rcParams.update({'font.size': 16})
 	
-	x_losses = [*range(len(train_losses))]
+	# During CV, the dataset size was 23050, and the batch size was 1000.
+	# Each test loss is computed with a single, randomly sampled batch.
+	# This means that occaisonally, a batch of only 50 samples is used.
+	# Because the losses are computed by summing over the batch, this 
+	# results in losses that are 20x smaller than the ones computed using
+	# 1000 sample batches. This line corrects for that.
+	test_losses = [x if x > 5e5 else x*20 for x in test_losses]
+	# CV batch size always 1000
+	test_losses = np.array(test_losses) / 1000
+	train_losses = np.array(train_losses) / batch_size
 	
+	# multiply by 100 bc sampled loss/F1 at every 100th batch during training
+	x_losses = [100*i for i in range(len(train_losses))]
+		
 	fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 	
 	axs[0].set_title("Optimization Learning Curve")
 	axs[1].set_title("Performance Learning Curve")
 	
-	axs[0].set_ylim(10**4,10**7)
+	#axs[0].set_ylim(10**4,10**7)
 	axs[1].set_ylim(0,1)
 	
+	posn = [5000*i for i in range( max(x_losses) )]
+	axs[0].set_xticks(posn)
+	axs[1].set_xticks(posn)
+			
 	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=5)
 	axs[0].plot(x_losses, test_losses, marker='.', c='#ff6666', label='CV', markersize=5)
 	
 	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=5)
 	axs[1].plot(x_losses, test_f1s, marker='.', c='#ff6666', label='CV', markersize=5)
 	
-	axs[0].set_xlim(-5,x_losses[-1]+5)
-	axs[1].set_xlim(-5,x_losses[-1]+5)
+	axs[0].set_xlim(-50,x_losses[-1]+5) # tweaking left side because otherwise the first data point is hard to see on the plot
+	axs[1].set_xlim(-50,x_losses[-1]+5)
 	
 	axs[0].set_ylabel('Loss (KLD + BCE)')
 	axs[0].semilogy()
 	axs[1].set_ylabel('F1 score')
 	
-	axs[0].set_xlabel('Experience')
-	axs[1].set_xlabel('Experience')
+	axs[0].set_xlabel('Experience (batch)')
+	axs[1].set_xlabel('Experience (batch)')
 	
 	axs[1].axhline(y=max(test_f1s), color='r', dashes=(1,1))
 	print("max F1 score", max(test_f1s))
@@ -715,8 +765,12 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	
 	n_genomes = target.shape[0]
 	n_genes = target.shape[1]
+
 	
 	# Calculate scores for each individual gene
+	# Note: some genes may have been present in the training set and not in the test set, so in some cases there will be no positive samples in y_true
+	warnings.filterwarnings("ignore", category=UndefinedMetricWarning)	
+
 	for i in range(n_genes):
 		fpr[i], tpr[i], thresh = roc_curve(target[:, i], y_probas[:, i])
 		
@@ -738,16 +792,17 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	# plot
 	   
 	ax = axs[2]
-	a = random.sample(range(target.shape[1]), n_examples)
+	np.random.seed(42)
+	a = np.random.choice(np.arange(target.shape[1]), n_examples, replace=False)
 	for i in range(len(a)):
-		plt.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5,
-			 lw=1) #, label=cluster_names[i]+" (AUC = %0.2f)" % roc_auc[i])
-	plt.plot(fpr_micro, tpr_micro, color='black', 
+		ax.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5, lw=1)
+	ax.plot(fpr_micro, tpr_micro, color='black', 
 			 lw=2, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
-	plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--', label='Micro-average')
-
-	plt.xlim([-0.01, 1.01])
-	plt.ylim([0, 1.0])
+	ax.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--', label='Random')
+	ax.legend(loc="lower right", fontsize="x-small")
+	
+	ax.set_xlim([0, 1.0])
+	ax.set_ylim([0, 1.0])
 
 	axs[2].set_xlabel('False Positive Rate')
 	axs[2].set_ylabel('True Positive Rate')
@@ -756,6 +811,12 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	plt.tight_layout()
 	
 	return fig
+
+
+
+
+
+
 
 def genus_boxplot_stats(groups):
 	"""
@@ -772,8 +833,8 @@ def genus_boxplot_stats(groups):
 	dep_var = []
 	
 	for i, name in enumerate(groups):
-	    scores.extend(name)
-	    dep_var.extend([i]*len(name))
+		scores.extend(name)
+		dep_var.extend([i]*len(name))
 	df = pd.DataFrame([dep_var, scores], ['group', 'F1']).T
 	
 	# one way anova
@@ -809,9 +870,11 @@ def plot_mod_count_vs_f1(test_input_mods, f1s):
 	
 	fig = fig, ax = plt.subplots() 
 	plt.scatter(mod_count, mod_f1s)
-	plt.xlabel("Number of mod occurences in the corrupted training dataset")
+	plt.xlabel("Number of module occurences\nin the corrupted training dataset")
 	plt.ylabel("F1 score on test set")
 	plt.xscale('log')
+	
+	return fig
 	
 def map_proc_mod():
 	"""
@@ -924,31 +987,27 @@ def plot_metab_pathway_f1_horizontal(process_to_mod, mod_to_kos_clean, all_kos, 
 	
 	plt.yticks([i+1 for i in range(len(list_procs))], [proc for proc in list_procs], rotation=0)
 	plt.xlabel('F1 score')
-	
+	ax.set_xlim(0,1)
 	return fig, proc_to_ko_F1s
 
-def export_selected_generated(BASE_DIR, gen_kos, gen_idx):
+def export_selected_generated(OUT_DIR, gen_kos, gen_idx):
 	"""
 	Export a particular generated genome from our set of n used for the paper analysis
 	
 	Arguments:
-		BASE_DIR (str) -- path to working dir
+		OUT_DIR (str) -- path to working dir
 		gen_kos (list) -- KO numbers encoded by genome vector
 		gen_idx (int) -- index of genome vector of interest
 	"""
 	date = pre_process.datenow()
-	save_to = BASE_DIR+'prot_out_'+str(gen_idx)+'_'+date+'.txt'
-	print('saving file to',save_to = BASE_DIR+'prot_out_'+str(gen_idx)+'_'+date+'.txt')
-	
-	with open(BASE_DIR+'seq_dict.pkl', 'rb') as handle:
-		seq_dict = pickle.load(handle)
+	save_to = OUT_DIR+'prot_out_'+str(gen_idx)+'_'+date+'.txt'
+	print('saving file to',save_to)
 	
 	with open(save_to, 'w') as handle:
-		for prot in gen_kos:
-			handle.write(">"+prot+"\n")
-			handle.write(seq_dict[prot]+"\n")
+		for i, prot in enumerate(gen_kos):
+			handle.write("gene"+str(i)+" "+prot+"\n")
 
-def new_genome_random(mod_to_ko_clean, model, all_kos, BASE_DIR):
+def new_vector_random(mod_to_ko_clean, model, all_kos):
 	"""
 	Use DeepGenome to generate a new genome vector
 	
@@ -956,21 +1015,20 @@ def new_genome_random(mod_to_ko_clean, model, all_kos, BASE_DIR):
 		mod_to_ko_clean (dict )-- the functions of many modules can be "completed" by different sets of genes. Here we choose to represent each module by the most common set of genes. Dict maps each module (e.g.: 'K00001') to a list of genes (e.g.: ['K00845', ..., 'K00873'])
 		model (genome_embeddings.models.VariationalAutoEncoder) -- trained VAE model
 		all_kos (list) -- list of all KOs in the dataset
-		BASE_DIR (str) -- path to working dir
-	"""
-	with open(BASE_DIR+'seq_dict.pkl', 'rb') as handle:
-		seq_dict = pickle.load(handle)
 	
+	Returns:
+		ko_ids (list) -- a list of KOs encoded in the generated genome vector
+	"""	
 	my_corrupted = torch.zeros(len(all_kos))
 	
 	# Pick 10 random modules as input
 	n_mods = 10
-	keeps = random.sample(list(mod_to_kos_clean.keys()), n_mods)
+	keeps = random.sample(list(mod_to_ko_clean.keys()), n_mods)
 	
 	# Get the genes for those modules
 	idxs = []
 	for mod in keeps:
-		for ko in mod_to_kos_clean[mod]:
+		for ko in mod_to_ko_clean[mod]:
 			idxs.append(all_kos.index(ko))
 	
 	my_corrupted[idxs] = 1
@@ -988,14 +1046,10 @@ def new_genome_random(mod_to_ko_clean, model, all_kos, BASE_DIR):
 	ko_ids = []
 	for idx in on_idx:
 		ko_ids.append(all_kos[idx])
-		
-	with open(save_to, 'w') as handle:
-		for prot in ko_ids:
-			handle.write(">"+prot+"\n")
-			handle.write(seq_dict[prot]+"\n")
 	
-	return ko_ids
-
+	for i in ko_ids:
+		print(i)
+				
 def generate_genomes(n_gen, all_kos, mod_to_kos, n_mods, model):
 	"""
 	Generate new genomes using a trained VAE model
@@ -1064,8 +1118,8 @@ def pca_gen_vs_real(generated, test_data, idx=None):
 	concated = torch.cat((torch.Tensor(test_data), generated), 0).numpy()
 	
 	# generate labels
-	test_data_labels = ['test' for i in range(test_data.shape[0])]
-	generated_labels = ['generated' for i in range(n_gen)]
+	test_data_labels = ['Real' for i in range(test_data.shape[0])]
+	generated_labels = ['Generated' for i in range(n_gen)]
 	
 	# convert to df
 	df = pd.DataFrame(concated)
@@ -1098,7 +1152,7 @@ def pca_gen_vs_real(generated, test_data, idx=None):
 	ax.set_xlabel('Principal Component 1', fontsize = 11)
 	ax.set_ylabel('Principal Component 2', fontsize = 11)
 	ax.grid()
-	targets = ['test', 'generated'] #, 'train']
+	targets = ['Real', 'Generated'] #, 'train']
 	colors = ['g', 'b']
 	for target, color in zip(targets,colors):
 		indicesToKeep = labels_df == target
@@ -1143,12 +1197,12 @@ def df_for_phylip(generated, test_data, test_genomes, all_kos):
 
 	return df
 
-def write_out_for_phylip(BASE_DIR, df, tnum_to_tla, test_tax_dict):
+def write_out_for_phylip(OUT_DIR, df, tnum_to_tla, test_tax_dict):
 	"""
 	Converts df of genome vectors into character matrix that can be input to Phylip, writes to disk
 	
 	Arguments:
-		BASE_DIR (str) -- directory where file will be saved
+		OUT_DIR (str) -- directory where file will be saved
 		df (df) -- rows = genomes (ID is tnum), columns = genes
 		tnum_to_tla (dict) -- converts tnum to tla (diff types of genome ID)
 		test_tax_dict (dict of list) -- for each tla, list of domain, phylum, class, etc
@@ -1158,7 +1212,7 @@ def write_out_for_phylip(BASE_DIR, df, tnum_to_tla, test_tax_dict):
 		phylip_in.txt (txt saved to disk) -- character matrix for input to phylip
 	"""
 	date = pre_process.datenow() 
-	save_to = BASE_DIR+"phylip_in"+date+".txt"
+	save_to = OUT_DIR+"phylip_in"+date+".txt"
 	print("file will be saved as",save_to)
 	
 	phylum_dict = {}
@@ -1242,19 +1296,19 @@ def get_phyla_colours():
 	
 	return phyla_colours
 	
-def colour_real_itol(BASE_DIR, phyla_colours, phylum_dict):
+def colour_real_itol(OUT_DIR, phyla_colours, phylum_dict):
 	"""
 	Creates iTOL colorstrip file for gene +/- dendrogram, colours = phyla of test genomes
 	
 	Arguments:
-		BASE_DIR (str) -- directory in which to save file
+		OUT_DIR (str) -- directory in which to save file
 		phyla_colours (dict) -- keys = phyla, values = unique colour (rbg)
 		 phylum_dict (dict of lists) -- keys = phyla, values = list of tax (domain, phylum, class, etc)
 	Returns:
 		vae_dendro_colours_real.txt (saves to disk) -- colorstrip file
 	"""
 	date = pre_process.datenow() 
-	save_to = BASE_DIR+"vae_dendro_colours_real"+date+".txt"
+	save_to = OUT_DIR+"vae_dendro_colours_real"+date+".txt"
 	print("file will be saved as", save_to)
 
 	# legend shapes
@@ -1301,18 +1355,18 @@ def colour_real_itol(BASE_DIR, phyla_colours, phylum_dict):
 			out = i+" rgba("+str(colour[0])+","+str(colour[1])+","+str(colour[2])+")\n"
 			handle.write(out)
 
-def colour_generated_itol(BASE_DIR, phylum_dict):
+def colour_generated_itol(OUT_DIR, phylum_dict):
 	"""
 	Creates iTOL colorstrip file for gene +/- dendrogram, colours = real vs generated genome
 	
 	Arguments:
-		BASE_DIR (str) -- directory in which to save file
+		OUT_DIR (str) -- directory in which to save file
 		 phylum_dict (dict of lists) -- keys = phyla, values = list of tax (domain, phylum, class, etc)
 	Returns:
 		vae_dendro_colours_generated.txt (saves to disk) -- colorstrip file
 	"""
 	date = pre_process.datenow() 
-	save_to = BASE_DIR+"vae_dendro_colours_generated"+date+".txt"
+	save_to = OUT_DIR+"vae_dendro_colours_generated"+date+".txt"
 	print("file will be saved as",save_to)
 	
 	# legend shapes
@@ -1534,7 +1588,7 @@ def arch_root(all_kos):
 	Returns:
 		barc_vec (list) -- archaeal genome vector
 	"""
-	path = config.ANNOTATIONS_PATH
+	path = config.DATA_ROOT+config.ANNOTATIONS_PATH
 	file = open(path+'barc_annotations.txt').readlines()
 	file = list(map(str.strip, file))
 	
@@ -1566,7 +1620,7 @@ def get_mod_names():
 		mod_names (dict) -- maps 5-letter name to full english name of all mods
 	"""
 	
-	process_to_mod = {}
+	mod_names = {}
 	path = config.KEGG_MODS
 	file = open(path).readlines()
 	file = list(map(str.strip, file))
@@ -1588,7 +1642,7 @@ def compare_inputs(test_input_mods, idx, tla_to_mod_to_kos, train_genomes, tla_t
 		tla_to_mod_to_kos (defaultdict of dicts) -- maps tla to series of dicts, keys are KEGG modules and values are lists of KOs in that module (e.g.: 'eun': {'M00001': ['K00845', etc]}, etc} etc})
 		train_genomes (list) -- tnums of genomes in the training set
 		tla_to_tnum (dict) -- for each genome, converts tla to tnum
-		mod_names
+		mod_names (dict) -- for each 5-letter mode code, maps to full english path (M00001 -> Glycolysis)
 		
 	Returns:
 		matplotlib.Figure
@@ -1617,13 +1671,12 @@ def compare_inputs(test_input_mods, idx, tla_to_mod_to_kos, train_genomes, tla_t
 		if all_present:
 			all_ten.append(tnum) 	
 	
-	
 	mods = [mod_names[i] for i in mod_count.keys()]
 	vals = mod_count.values()
 	vals, mods = zip(*sorted(zip(vals, mods), reverse=False))
 	
 	fig, ax = plt.subplots()
-	plt.barh(mods, vals, color='#3385ff')
+	plt.barh(mods, vals)
 	plt.xlabel("# genomes encoding module")
 	
 	return fig, all_ten
@@ -1742,13 +1795,14 @@ def make_pred(new_preds, model, corrupted, binarizer_threshold, name):
 		pred (tensor) -- for each genome in corrupted, y_probas prediction as to which genes should be on/off
 		binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
 	"""
-	if new_preds:
+	if new_preds and load_model:
 		model.eval()
 		with torch.no_grad():
 			pred = model.forward(corrupted)[0].detach()
 		binary_pred = eval_binarize(pred, binarizer_threshold)
 		torch.save(pred, name+"_preds.pt")
 		torch.save(binary_pred, name+"_binary_preds.pt")
+		print("Saved as "+name+"_preds.pt and "+name+"_binary_preds.pt")
 	else:
 		pred = torch.load(name+"_preds.pt")
 		binary_pred = torch.load(name+"_binary_preds.pt")
@@ -1799,14 +1853,18 @@ def nmods_vs_f1(c_test_genomes, test_input_mods, tla_to_mod_to_kos, tla_to_tnum,
 	
 	if ax is None:
 		fig, ax = plt.subplots()
+		ax.set_xlabel("# training set genome vectors\nsharing all 10 input modules")
+		ax.set_ylabel("F1 score")
 	else:
 		fig = None
 		
-	ax.scatter(num_mods, f1s)
+	ax.scatter(num_mods, f1s, s=1)
+	ax.set_xlim(left=0)
+	ax.set_ylim(0,1)
 	
 	return fig, num_mods		
 	
-def plot_tla_to_kos(c_test_genomes, tla_to_tnum, train_genomes, tnum_to_tax, tax_groups, f1s, ax=None):
+def genus_boxplot(c_test_genomes, tla_to_tnum, train_genomes, tnum_to_tax, f1s, ax=None):
 	"""
 	Barplot showing the # of same-genus genome vectors in the training set vs test set F1 scores
 	
@@ -1898,6 +1956,7 @@ def plot_tla_to_kos(c_test_genomes, tla_to_tnum, train_genomes, tnum_to_tax, tax
 		
 	ax.set_xlabel('# of same-genus genome vectors in training set')
 	ax.set_ylabel('F1 score')
+	ax.set_ylim(0,1)
 	
 	groups = [group_0, group_1, group_2, group_3, group_4, group_5]
 					   
@@ -1976,7 +2035,7 @@ def geneCount_vs_geneF1(corrupted_train, num_features, ko_f1s, ax=None):
 	
 	return fig
 
-def model_performance_factors(c_test_genomes, tla_to_tnum, tnum_to_tax, tax_groups, f1s, corrupted_train, num_features, ko_f1s, uncorrupted_test, train_genomes, test_input_mods, tla_to_mod_to_kos):
+def model_performance_factors(c_test_genomes, tla_to_tnum, tnum_to_tax, f1s, corrupted_train, num_features, ko_f1s, uncorrupted_test, train_genomes, test_input_mods, tla_to_mod_to_kos):
 	"""
 	Arguments:
 		c_test_genomes (list) -- -- tnum corresponding to each row (genome) of corrupted_test
@@ -2001,7 +2060,7 @@ def model_performance_factors(c_test_genomes, tla_to_tnum, tnum_to_tax, tax_grou
 	ax4 = axs[1,1]
 	
 	# Panel A
-	plot_tla_to_kos(c_test_genomes, tla_to_tnum, train_genomes, tnum_to_tax, tax_groups, f1s, ax=ax1)
+	genus_boxplot(c_test_genomes, tla_to_tnum, train_genomes, tnum_to_tax, f1s, ax=ax1)
 	
 	# Panel B
 	geneCount_vs_geneF1(corrupted_train, num_features, ko_f1s, ax=ax2)
@@ -2122,7 +2181,7 @@ def dist_genes_mods(generated, all_kos, mod_to_ko_clean, test_data):
 	#ax1.legend(['Real', 'Generated'])
 	ax1.set_xlabel("Number of genes")
 	ax1.set_ylabel("Genome count")
-	
+	 
 	# Plot number of complete mods per genome
 	ax2.hist(gen_mod_lens, 50, color='b', alpha=0.5)
 	ax2.hist(real_mod_lens, 50, color='g', alpha=0.5)
@@ -2187,3 +2246,38 @@ def id_incomplete_mods(generated_inputs, gen_idx, mod_to_ko_clean, gen_kos):
 		print(mod_to_ko_clean[mod])
 		mod_completeness(gen_kos, mod_to_ko_clean, mod)
 		print("--------------------------------------------")
+
+def auroc(y_true, y_pred):
+	"""
+	Calculate AUROC score
+	
+	Arguments:
+	y_true (torch.Tensor) -- true labels
+	y_pred (torch.Tensor) -- predicted labels
+	"""
+	return roc_auc_score(y_true.numpy().ravel(), y_pred.numpy().ravel())
+	
+#	fpr = dict()
+#	tpr = dict()
+#	roc_auc = dict()	
+#	
+#	n_genomes = target.shape[0]
+#	n_genes = target.shape[1]
+#
+#	
+#	# Calculate scores for each individual gene
+#	# Note: some genes may have been present in the training set and not in the test set, so in some cases there will be no positive samples in y_true
+#	warnings.filterwarnings("ignore", category=UndefinedMetricWarning)	
+#
+#	for i in range(n_genes):
+#		fpr[i], tpr[i], thresh = roc_curve(target[:, i], y_probas[:, i])
+#		
+#		if np.isnan(fpr[i]).any():
+#			continue
+#			
+#	# Calculate micro-average
+#	fpr_micro, tpr_micro, _ = roc_curve(target.ravel(), y_probas.ravel())
+#	roc_auc["micro"] = auc(fpr_micro, tpr_micro)	
+	
+	
+	

@@ -15,12 +15,12 @@ from genome_embeddings import trainable # must import before ray
 import ray # must import after trainable
 
 date = date.today()
-BASE_DIR = '/home/ndudek/projects/def-dprecup/ndudek/'
+OUT_DIR = '/home/ndudek/projects/def-dprecup/ndudek/'
 
 # Set experimental parameters
 settings = Namespace(
-	DATA_FP = BASE_DIR+'hp_tuning_'+date+'/',
-	SAVE_FP = BASE_DIR+'hp_tuning_'+date+'/',
+	DATA_FP = OUT_DIR+'hp_tuning_'+date+'/',
+	SAVE_FP = OUT_DIR+'hp_tuning_'+date+'/',
 	num_epochs = 10,
 	num_cpus=10, 
 	replacement_threshold = 0.5, # probability over which binarizer converts to 
@@ -61,7 +61,7 @@ analysis = tune.run(
     num_samples=100,  
     queue_trials=True,
     #local_dir='/Users/natasha/Desktop/TUNE_RESULT_DIR',
-    local_dir=BASE_DIR+'hp_tuning_'+date+'//TUNE_RESULT_DIR'
+    local_dir=OUT_DIR+'hp_tuning_'+date+'//TUNE_RESULT_DIR'
     )
 
 print('Best config is:', analysis.get_best_config(metric='test_f1'))

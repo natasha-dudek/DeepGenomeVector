@@ -15,8 +15,6 @@ import pandas as pd
 import pickle
 import ray
 from ray import tune
-from ray.tune import track
-from ray.tune.stopper import Stopper
 import sklearn as sk
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import Binarizer
@@ -80,7 +78,6 @@ def f1_score(pred_non_bin, target, replacement_threshold):
 	return f1
 
 def cv_dataloader(batch_size, num_features, k):
-
 	"""
 	Creates training dataloader w/ k-folds for cross validation
 	Note: only creates 1 split regardless of # k -- improves training speed (method of skorch CVSplit)
@@ -111,7 +108,7 @@ def cv_dataloader(batch_size, num_features, k):
 	y_cv = y[cv_idx]
 	
 	# Create dataloaders
-	batch_size_cv = 1000 # always test on CV set of size 1000
+	batch_size_cv = 1000 
 	train_ds = TensorDataset(X_train, y_train)
 	cv_ds = TensorDataset(X_cv, y_cv)
 	train_dl = DataLoader(train_ds, batch_size=batch_size, drop_last=False, shuffle=True)
@@ -246,7 +243,7 @@ def train_VAE_w_tune(config, reporter):
 	# if memory usage is high, may be able to free up space by calling garbage collect
 	auto_garbage_collect()		 
 
-def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, BASE_DIR):
+def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs, replacement_threshold, OUT_DIR):
 	"""
 	Train a single VAE (i.e. not during HP tuning), save model and y_probas 
 	
@@ -258,7 +255,7 @@ def train_single_vae(nn_layers, weight_decay, lr, batch_size, kfolds, num_epochs
 		kfolds (int) -- number of folds for K-fold cross validation
 		num_epochs (int) -- number of epochs for which to train
 		replacement_threshold (float) -- probability thresh after which to convert bit to 1 vs 0
-		BASE_DIR (str) -- path to working dir
+		OUT_DIR (str) -- path to working dir
 		
 	Returns:
 		kld (list) -- KLD loss values from training
@@ -363,8 +360,6 @@ def load_model(name):
 		test_losses (list) -- test losses (KLD + BCE)
 		train_f1s (list) -- training F1	scores
 		test_f1s (list) -- test F1 scores
-		bce (list) -- BCE losses during training
-		kld (list) -- KLD losses during training
 	"""
 	num_features = data.num_features
 	model = models.VariationalAutoEncoder(num_features, 3)
@@ -373,7 +368,5 @@ def load_model(name):
 	test_losses = torch.load(name+"_test_losses.pt")
 	train_f1s = torch.load(name+"_train_f1s.pt")
 	test_f1s = torch.load(name+"_test_f1s.pt")
-	bce = torch.load(name+"_bce.pt")
-	kld = torch.load(name+"_kld.pt")
 	
-	return model, train_losses, test_losses, train_f1s, test_f1s, bce, kld
+	return model, train_losses, test_losses, train_f1s, test_f1s
