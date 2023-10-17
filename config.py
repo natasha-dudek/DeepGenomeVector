@@ -1,15 +1,3 @@
-#DATA_ROOT = "/Users/natasha/Documents/Research/mcgill_postdoc/"
-#
-#TRAIN_DATA_PATH = DATA_ROOT+"vae/corrupted_train_2021-01-05_10mods.pt"
-#TEST_DATA_PATH = DATA_ROOT+"vae/corrupted_test_2021-01-05_10mods.pt"
-#
-#NCBI_LINEAGES_PATH = "ncbi_genomes/kegg_dataset/ncbi_lineages_2020-05-04.csv"	
-#
-#KEGG_MODS = DATA_ROOT+"ncbi_genomes/kegg_dataset/kegg_modules.txt"
-#
-#ANNOTATIONS_PATH = 'ncbi_genomes/kegg_dataset/annotations/'
-
-
 DATA_ROOT = "/Users/natasha/Desktop/DeepGenome/"
 
 TRAIN_DATA_PATH = DATA_ROOT+"output/corrupted_train_2021-01-05_10mods.pt"
