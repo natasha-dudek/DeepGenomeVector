@@ -1,8 +1,8 @@
-# DeepGenome
+# DeepGenomeVector
 
 This repository contains a python implementation (tested on version 3.7.6) for the DeepGenome model described in: 
 
-_Dudek, N.K. & Precup, D. Towards AI-designed genomes using machine learning. In prep for submission (2022)._
+_Dudek, N.K. & Precup, D. Towards AI-designed genomes using machine learning. In prep for submission (2023)._
 
 Here, we introduce a framework for training a machine learning algorithm to learn the basic genetic principles underlying the gene composition of bacterial genomes. Given a set of desired pathways (e.g., glycolysis, TCA cycle, and butane degradation), our variational autoencoder (VAE) model strives to generate synthetic bacterial "genome vectors" - vectors denoting the full complement of genes that would need to be encoded to support a viable cell that supports the user-defined input functions.
 
