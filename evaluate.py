@@ -12,11 +12,12 @@ import pandas as pd
 import pylab as P
 from pingouin import anova
 from scipy import stats
+from scipy.stats import mannwhitneyu, linregress
 import seaborn as sns
 import sklearn as sk
 from sklearn.decomposition import PCA
 from sklearn.exceptions import UndefinedMetricWarning
-from sklearn.metrics import accuracy_score, auc, confusion_matrix, hamming_loss, roc_curve, roc_auc_score
+from sklearn.metrics import accuracy_score, auc, confusion_matrix, hamming_loss, pairwise_distances, roc_curve, roc_auc_score
 from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.preprocessing import Binarizer
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
@@ -424,14 +425,14 @@ def generated_inputs_to_binary(generated_inputs, all_kos):
 	generated_inputs_binary = []
 	
 	for i in range(len(generated_inputs)):
-	    out = []
-	    for ko in all_kos:
-	        if ko in generated_inputs[i][1]:
-	            out.append(1)
-	        else:
-	            out.append(0)
-	    generated_inputs_binary.append(out)
-	    
+		out = []
+		for ko in all_kos:
+			if ko in generated_inputs[i][1]:
+				out.append(1)
+			else:
+				out.append(0)
+		generated_inputs_binary.append(out)
+		
 	return torch.Tensor(generated_inputs_binary)
 
 
@@ -503,35 +504,6 @@ def best_med_worst(f1s, c_test_genomes, tla_to_tnum):
 	worst = [idx_worst, tla_worst, f1s[idx_worst], tla_to_tnum[tla_worst]]
 	
 	return best, median, worst
-
-def test_f1s(uncorrupted, binary_pred):
-	"""
-	Calculate F1 scores for all genomes in the test set and plot a histogram
-	
-	Arguments:
-		uncorrupted (tensor) -- uncorrupted test data; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
-		binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
-		
-	Returns:
-		f1s (list) -- F1 scores for each genome in the test set
-		matplotlib.Figure
-	"""
-	f1s = []
-	for i in range(0,len(binary_pred)):
-		f1 = sk.metrics.f1_score(uncorrupted[i], binary_pred[i], zero_division=0)
-		f1s.append(f1)
-	
-	print("median F1 score:",np.median(f1s))
-	print("min F1 score", min(f1s))
-	print("max F1 score", max(f1s))
-	
-	fig = fig, ax = plt.subplots()	
-	plt.hist(f1s)
-	plt.xlabel('F1 score')
-	plt.ylabel('Count')
-	ax.set_xlim(right=1)
-	
-	return f1s, fig
 
 def f1s_per_phylum(train_tax_dict, test_tax_dict, c_test_genomes, f1s):
 	"""
@@ -647,7 +619,14 @@ def ngenesUncorrupted_vs_f1(uncorrupted_test, f1s, ax=None):
 	ax.set_xlabel("# genes in uncorrupted genome")
 	ax.set_ylabel("F1 score")
 	ax.set_ylim(0,1)
-	
+	# regression line
+	b, a = np.polyfit(n_genes_uncorrupted, f1s, 1)
+	xseq = np.linspace(min(n_genes_uncorrupted)-50, max(n_genes_uncorrupted)+50, num=100)
+	ax.plot(xseq, [a + (b * i) for i in xseq], color="k", lw=2.5);
+	regression_stats = linregress(n_genes_uncorrupted, f1s)
+	print("R2",regression_stats.rvalue**2)
+	print("pvalue for test where null = slope is zero",regression_stats.pvalue)
+
 	return fig
 
 def ngenesCorrupted_vs_f1(corrupted_test, f1s):
@@ -693,9 +672,38 @@ def plot_train_count_hist(train_input_mods):
 	
 	return fig, train_out
 
-def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y_probas, batch_size):
+def test_f1s(uncorrupted, binary_pred):
 	"""
-	Plots two learning curves and an ROC curve -- i.e. a pretty figure for the manuscript
+	Calculate F1 scores for all genomes in the test set and plot a histogram
+	
+	Arguments:
+		uncorrupted (tensor) -- uncorrupted test data; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
+		binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
+		
+	Returns:
+		f1s (list) -- F1 scores for each genome in the test set
+		matplotlib.Figure
+	"""
+	f1s = []
+	for i in range(0,len(binary_pred)):
+		f1 = sk.metrics.f1_score(uncorrupted[i], binary_pred[i], zero_division=0)
+		f1s.append(f1)
+	
+	print("median F1 score:",np.median(f1s))
+	print("min F1 score", min(f1s))
+	print("max F1 score", max(f1s))
+	
+	fig = fig, ax = plt.subplots()	
+	plt.hist(f1s)
+	plt.xlabel('F1 score')
+	plt.ylabel('Count')
+	ax.set_xlim(right=1)
+	
+	return f1s, fig
+	
+def quantEval(train_losses, test_losses, train_f1s, test_f1s, target, y_probas, batch_size, uncorrupted, binary_pred):
+	"""
+	Plots two learning curves (optimization, performance), an ROC curve, and histogram of F1 scores -- i.e. a figure for the manuscript
 	
 	Arguments:
 		train_losses (list) -- training losses (KLD + BCE)
@@ -704,7 +712,9 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 		test_f1s (list) -- test F1	scores
 		target (numpy.ndarray) -- uncorrupted genomes, rows are genomes and columns are genes 
 		y_probas (numpy.ndarray) -- model predictions, rows are genomes and columns are genes 
-		
+		uncorrupted (tensor) -- uncorrupted test data; rows = genomes, columns = genes; 1 = gene encoded by genome, 0 = absent from genome
+		binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
+				
 	Returns:
 		matplotlib.Figure
 	"""
@@ -724,39 +734,39 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	# multiply by 100 bc sampled loss/F1 at every 100th batch during training
 	x_losses = [100*i for i in range(len(train_losses))]
 		
-	fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+	fig, axs = plt.subplots(2, 2, figsize=(15, 15))
 	
-	axs[0].set_title("Optimization Learning Curve")
-	axs[1].set_title("Performance Learning Curve")
+	axs[0][0].set_title("Optimization Learning Curve")
+	axs[0][1].set_title("Performance Learning Curve")
 	
 	#axs[0].set_ylim(10**4,10**7)
-	axs[1].set_ylim(0,1)
+	axs[0][1].set_ylim(0,1)
 	
 	posn = [5000*i for i in range( max(x_losses) )]
-	axs[0].set_xticks(posn)
-	axs[1].set_xticks(posn)
+	axs[0][0].set_xticks(posn)
+	axs[0][1].set_xticks(posn)
 			
-	axs[0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=5)
-	axs[0].plot(x_losses, test_losses, marker='.', c='#ff6666', label='CV', markersize=5)
+	axs[0][0].plot(x_losses, train_losses, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[0][0].plot(x_losses, test_losses, marker='.', c='#ff6666', label='CV', markersize=5)
 	
-	axs[1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=5)
-	axs[1].plot(x_losses, test_f1s, marker='.', c='#ff6666', label='CV', markersize=5)
+	axs[0][1].plot(x_losses, train_f1s, marker='.', c='#3385ff', label='Training', markersize=5)
+	axs[0][1].plot(x_losses, test_f1s, marker='.', c='#ff6666', label='CV', markersize=5)
 	
-	axs[0].set_xlim(-50,x_losses[-1]+5) # tweaking left side because otherwise the first data point is hard to see on the plot
-	axs[1].set_xlim(-50,x_losses[-1]+5)
+	axs[0][0].set_xlim(-50,x_losses[-1]+5) # tweaking left side because otherwise the first data point is hard to see on the plot
+	axs[0][1].set_xlim(-50,x_losses[-1]+5)
 	
-	axs[0].set_ylabel('Loss (KLD + BCE)')
-	axs[0].semilogy()
-	axs[1].set_ylabel('F1 score')
+	axs[0][0].set_ylabel('Loss (KLD + BCE)')
+	axs[0][0].semilogy()
+	axs[0][1].set_ylabel('F1 score')
 	
-	axs[0].set_xlabel('Experience (batch)')
-	axs[1].set_xlabel('Experience (batch)')
+	axs[0][0].set_xlabel('Experience (batch)')
+	axs[0][1].set_xlabel('Experience (batch)')
 	
-	axs[1].axhline(y=max(test_f1s), color='r', dashes=(1,1))
+	axs[0][1].axhline(y=max(test_f1s), color='r', dashes=(1,1))
 	print("max F1 score", max(test_f1s))
 	
-	axs[0].legend(loc="upper right")
-	axs[1].legend(loc="lower right")
+	axs[0][0].legend(loc="upper right")
+	axs[0][1].legend(loc="lower right")
 		
 	####### Begin ROC/AUC calculations
 	fpr = dict()
@@ -791,22 +801,37 @@ def learningNroc_curve(train_losses, test_losses, train_f1s, test_f1s, target, y
 	
 	# plot
 	   
-	ax = axs[2]
 	np.random.seed(42)
 	a = np.random.choice(np.arange(target.shape[1]), n_examples, replace=False)
 	for i in range(len(a)):
-		ax.plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5, lw=1)
-	ax.plot(fpr_micro, tpr_micro, color='black', 
+		axs[1][0].plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5, lw=1)
+	axs[1][0].plot(fpr_micro, tpr_micro, color='black', 
 			 lw=2, label='Micro-average (AUC = %0.2f)' % roc_auc["micro"])
-	ax.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--', label='Random')
-	ax.legend(loc="lower right", fontsize="x-small")
+	axs[1][0].plot([0, 1], [0, 1], color='black', lw=2, linestyle='--', label='Random')
+	axs[1][0].legend(loc="lower right", fontsize="x-small")
 	
-	ax.set_xlim([0, 1.0])
-	ax.set_ylim([0, 1.0])
+	axs[1][0].set_xlim([0, 1.0])
+	axs[1][0].set_ylim([0, 1.0])
 
-	axs[2].set_xlabel('False Positive Rate')
-	axs[2].set_ylabel('True Positive Rate')
-	axs[2].set_title('ROC Curve')
+	axs[1][0].set_xlabel('False Positive Rate')
+	axs[1][0].set_ylabel('True Positive Rate')
+	axs[1][0].set_title('ROC Curve')
+	
+	### F1 histogram
+	f1s = []
+	for i in range(0,len(binary_pred)):
+		f1 = sk.metrics.f1_score(uncorrupted[i], binary_pred[i], zero_division=0)
+		f1s.append(f1)
+	
+	print("median F1 score:",np.median(f1s))
+	print("min F1 score", min(f1s))
+	print("max F1 score", max(f1s))
+	
+	axs[1][1].hist(f1s)
+	axs[1][1].set_xlabel('F1 score')
+	axs[1][1].set_ylabel('Count')
+	axs[1][1].set_xlim(right=1)
+	axs[1][1].set_title('Distribution of F1 Scores')
 	
 	plt.tight_layout()
 	
@@ -1100,6 +1125,61 @@ def generate_genomes(n_gen, all_kos, mod_to_kos, n_mods, model):
 
 	return generated, generated_inputs
 
+def estimate_hamming_novelty(test_data, generated, train_data): 
+	"""
+	Calculate minimum hamming distance between a) generated genomes to training genomes, b) test set genomes to training genomes. Use the Mann-Whitney U test to evaluate whether the distributions are different.
+	
+	Arguments:
+		test_data (numpy.ndarray) -- rows are genomes, columns are genes/KOs. 1's denote presence of a gene in the genome, 0's denote absence
+		generated (tensor) -- generated genome vectors. Rows are genomes, columns are genes. 1's denote a gene is encoded, 0 denotes that it is not
+		train_data (tensor) -- training data
+		
+	Returns: 
+		minh_test (list) -- minimum hamming distances between each test set genome vector and it's most similar match in the training set.
+		minh_gen (list) -- minimum hamming distances between each generated genome vector and it's most similar match in the training set.
+	"""
+
+	def min_hamming_distances(genome_vectors, train_data):
+		dist = pairwise_distances(genome_vectors, train_data, metric='hamming')
+		mindist = np.min(dist, axis=1)
+		return mindist
+		
+	minh_test = min_hamming_distances(test_data, train_data)
+	minh_gen = min_hamming_distances(generated, train_data)
+	
+	print("test set: median, MAD, min, and max", np.median(minh_test), stats.median_absolute_deviation(minh_test), min(minh_test), max(minh_test))
+	print("generated: median, MAD, min, and max", np.median(minh_gen), stats.median_absolute_deviation(minh_gen), min(minh_gen), max(minh_gen))
+	
+	U1, p = mannwhitneyu(minh_test, minh_gen)
+	print("Mann-Whitney U, p-val:", p)
+	
+	return minh_test, minh_gen
+
+def plot_hamming_novelty(minh_test, minh_gen):
+	"""
+	Plot histogram showing minimum hamming distance between a) generated genomes to training genomes, b) test set genomes to training genomes. Use the Mann-Whitney U test to evaluate whether the distributions are different.
+	
+	Arguments:
+		minh_test (list) -- minimum hamming distances between each test set genome vector and it's most similar match in the training set.
+		minh_gen (list) -- minimum hamming distances between each generated genome vector and it's most similar match in the training set.
+		
+	Returns: 
+		matplotlib.Figure
+	"""	
+	fig, ax = plt.subplots(figsize = (7.6,2.25)) 
+	bins = np.linspace(0, 1, 100)
+	ax.hist(minh_test, bins, alpha=0.5, label='Real', color='g')
+	ax.hist(minh_gen, bins, alpha=0.5, label='Generated', color='b')
+	ax.set_yscale('log')
+	ax.set_xlabel('Hamming Distance')
+	ax.set_ylabel('Frequency')
+	ax.set_xlim(0, max(max(minh_test), max(minh_gen))+0.02)
+	ax.legend(prop={'size': 10})
+	# this line just makes the aspect ratio work for when creating a multi-panel Figure for the paper
+	#ax.set_aspect(19/58) 
+	
+	return fig
+
 def pca_gen_vs_real(generated, test_data, idx=None):
 	"""
 	Plot PCA of Jaccard similarity between genomes, using Hamming distances as a metric
@@ -1114,7 +1194,7 @@ def pca_gen_vs_real(generated, test_data, idx=None):
 	"""	
 	n_gen = generated.shape[0]
 	
-	# concatenate real and fake genomes
+	# concatenate real and generated genome vectors
 	concated = torch.cat((torch.Tensor(test_data), generated), 0).numpy()
 	
 	# generate labels
@@ -1142,15 +1222,17 @@ def pca_gen_vs_real(generated, test_data, idx=None):
 	
 	finalDf = pd.concat([principalDf, labels_df], axis = 1)
 	
-	var_one = pca.explained_variance_[0]
-	var_two = pca.explained_variance_[1]
+	# Percentage of variance explained by each of the selected components.
+	var_one = pca.explained_variance_ratio_[0]
+	var_two = pca.explained_variance_ratio_[1]
 	
 	# Plot figure
 	plt.rcParams.update({'font.size': 12})
 	fig = plt.figure(figsize = (7.5,3))
+	#fig = plt.figure(figsize = (var_one*10, var_two*10))
 	ax = fig.add_subplot(1,1,1) 
-	ax.set_xlabel('Principal Component 1', fontsize = 11)
-	ax.set_ylabel('Principal Component 2', fontsize = 11)
+	ax.set_xlabel('Principal Component 1 \n['+str(round(var_one*100, 2))+'%]', fontsize = 11)
+	ax.set_ylabel('Principal Component 2 \n['+str(round(var_two*100, 2))+'%]', fontsize = 11)
 	ax.grid()
 	targets = ['Real', 'Generated'] #, 'train']
 	colors = ['g', 'b']
@@ -1168,8 +1250,9 @@ def pca_gen_vs_real(generated, test_data, idx=None):
 					   , c = 'r'
 					   , s = 10)
 	ax.legend(targets,loc='lower right')
-	plt.axis('scaled')
-  
+	
+	ax.set_aspect(np.sqrt(var_two/var_one)) 
+
 	return fig
 	
 def df_for_phylip(generated, test_data, test_genomes, all_kos):
@@ -1669,7 +1752,7 @@ def compare_inputs(test_input_mods, idx, tla_to_mod_to_kos, train_genomes, tla_t
 		for i in gen_mods:
 			if i not in mods: all_present = False
 		if all_present:
-			all_ten.append(tnum) 	
+			all_ten.append(tnum)	 
 	
 	mods = [mod_names[i] for i in mod_count.keys()]
 	vals = mod_count.values()
@@ -2032,7 +2115,19 @@ def geneCount_vs_geneF1(corrupted_train, num_features, ko_f1s, ax=None):
 #	ax.set_xticks(ax.get_xticks(), rotation=-70)
 	print("max KO count:",int(max(ko_counts)))
 	print("total number of training genomes:",tr_uncorrupted.shape[0])
+	# aysmptotic line
 	
+	from scipy.optimize import curve_fit
+
+	
+	
+	b, a = np.polyfit(ko_counts, ko_f1s, 1)
+	xseq = np.linspace(min(ko_counts)-50, max(ko_counts)+50, num=100)
+	ax.plot(xseq, [a + (b * i) for i in xseq], color="k", lw=2.5);
+	regression_stats = linregress(ko_counts, ko_f1s)
+	print("R2",regression_stats.rvalue**2)
+	print("pvalue for test where null = slope is zero",regression_stats.pvalue)
+
 	return fig
 
 def model_performance_factors(c_test_genomes, tla_to_tnum, tnum_to_tax, f1s, corrupted_train, num_features, ko_f1s, uncorrupted_test, train_genomes, test_input_mods, tla_to_mod_to_kos):
@@ -2183,15 +2278,15 @@ def dist_genes_mods(generated, all_kos, mod_to_ko_clean, test_data):
 	ax1.set_ylabel("Genome count")
 	 
 	# Plot number of complete mods per genome
-	ax2.hist(gen_mod_lens, 50, color='b', alpha=0.5)
 	ax2.hist(real_mod_lens, 50, color='g', alpha=0.5)
+	ax2.hist(gen_mod_lens, 50, color='b', alpha=0.5)
 	#ax2.legend(['Real', 'Generated'])
 	ax2.set_xlabel("Number of complete modules")
 	ax2.set_ylabel("Genome count")
 	
 	# Plot the fraction of genomes encoding each mod
-	ax3.bar(labels, gen_mod_freq, color='b', alpha=0.5)
 	ax3.bar(labels, real_mod_freq, color='g', alpha=0.5)
+	ax3.bar(labels, gen_mod_freq, color='b', alpha=0.5)
 	ax3.legend(['Real', 'Generated'])
 	ax3.set_xlabel("Module")
 	ax3.set_ylabel("Fraction of genomes \n encoding module")

@@ -1,3 +1,5 @@
+# Update paths to your directories
+
 DATA_ROOT = "/Users/natasha/Desktop/DeepGenome/"
 
 TRAIN_DATA_PATH = DATA_ROOT+"output/corrupted_train_2021-01-05_10mods.pt"
