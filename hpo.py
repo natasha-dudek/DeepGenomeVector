@@ -1,18 +1,17 @@
-from argparse import Namespace
-from collections import defaultdict
-from datatime import date
+import pickle
 import re
 import sys
+from argparse import Namespace
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
-from ray import tune
+import ray  # must import after trainable
 import torch
+from datatime import date
+from ray import tune
 
-from genome_embeddings import trainable # must import before ray
-
-import ray # must import after trainable
+from genome_embeddings import trainable  # must import before ray
 
 date = date.today()
 OUT_DIR = '/home/ndudek/projects/def-dprecup/ndudek/'
