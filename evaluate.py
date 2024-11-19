@@ -521,6 +521,8 @@ def compare_in_n_out(binary_pred, generated_inputs_binary):
     Returns:
             matplotlib.Figure
     """
+    blue = "#7094db"
+    
     out = {}
     for i, pred_row in enumerate(binary_pred):
         # what KOs were input?
@@ -531,12 +533,13 @@ def compare_in_n_out(binary_pred, generated_inputs_binary):
         out[i] = [num_out, num_in, float(num_out / num_in * 100)]
 
     perc_out = [int(out[i][2]) for i in out]
-    #
-    # 	fig = fig, ax = plt.subplots()
-    # 	plt.hist(perc_out, bins=50)
-    # 	plt.xlabel('Percent of input genes in output')
-    # 	plt.ylabel('Count')
-    # 	plt.xlim(0,105)
+
+    fig = fig, ax = plt.subplots()
+    plt.hist(perc_out, bins=50, color=blue)
+    plt.xlabel('Percent of input genes in output')
+    plt.yscale('log')
+    plt.ylabel('Count')
+    plt.xlim((min(perc_out)),100)
 
     count_hund = 0
     count_ninety = 0
@@ -561,6 +564,8 @@ def compare_in_n_out(binary_pred, generated_inputs_binary):
         + str(round(count_ninety / total * 100, 2))
         + "%)",
     )
+    
+    return fig
 
 
 def best_med_worst(f1s, c_test_genomes, tla_to_tnum):
@@ -830,7 +835,9 @@ def quantEval(
             matplotlib.Figure
     """
     plt.rcParams.update({"font.size": 16})
-
+    blue = "#7094db"
+    red = "#990000"
+    
     # During CV, the dataset size was 23050, and the batch size was 1000.
     # Each test loss is computed with a single, randomly sampled batch.
     # This means that occaisonally, a batch of only 50 samples is used.
@@ -845,7 +852,7 @@ def quantEval(
     # multiply by 100 bc sampled loss/F1 at every 100th batch during training
     x_losses = [100 * i for i in range(len(train_losses))]
 
-    fig, axs = plt.subplots(2, 2, figsize=(15, 15))
+    fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
     axs[0][0].set_title("Optimization Learning Curve")
     axs[0][1].set_title("Performance Learning Curve")
@@ -858,17 +865,17 @@ def quantEval(
     axs[0][1].set_xticks(posn)
 
     axs[0][0].plot(
-        x_losses, train_losses, marker=".", c="#3385ff", label="Training", markersize=5
+        x_losses, train_losses, marker=".", c=blue, label="Training", markersize=5
     )
     axs[0][0].plot(
-        x_losses, test_losses, marker=".", c="#ff6666", label="CV", markersize=5
+        x_losses, test_losses, marker=".", c=red, label="CV", markersize=5
     )
 
     axs[0][1].plot(
-        x_losses, train_f1s, marker=".", c="#3385ff", label="Training", markersize=5
+        x_losses, train_f1s, marker=".", c=blue, label="Training", markersize=5
     )
     axs[0][1].plot(
-        x_losses, test_f1s, marker=".", c="#ff6666", label="CV", markersize=5
+        x_losses, test_f1s, marker=".", c=red, label="CV", markersize=5
     )
 
     axs[0][0].set_xlim(
@@ -883,7 +890,7 @@ def quantEval(
     axs[0][0].set_xlabel("Experience (batch)")
     axs[0][1].set_xlabel("Experience (batch)")
 
-    axs[0][1].axhline(y=max(test_f1s), color="r", dashes=(1, 1))
+    axs[0][1].axhline(y=max(test_f1s), color="black", dashes=(1, 1))
     print("max F1 score", max(test_f1s))
 
     axs[0][0].legend(loc="upper right")
@@ -914,7 +921,7 @@ def quantEval(
     n_examples = 100  # number of example genes to plot on ROC curve
 
     # get colours for plotting
-    cm = plt.cm.get_cmap("brg")
+    cm = plt.cm.get_cmap("jet")
     c = np.linspace(0, 1, 50)  # start, stop, how_many
     colours = [cm(i) for i in c]
     colours = colours * 2
@@ -924,23 +931,23 @@ def quantEval(
     np.random.seed(42)
     a = np.random.choice(np.arange(target.shape[1]), n_examples, replace=False)
     for i in range(len(a)):
-        axs[1][0].plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5, lw=1)
-    axs[1][0].plot(
+        axs[1][1].plot(fpr[a[i]], tpr[a[i]], color=colours[i], alpha=0.5, lw=1)
+    axs[1][1].plot(
         fpr_micro,
         tpr_micro,
         color="black",
         lw=2,
         label="Micro-average (AUC = %0.2f)" % roc_auc["micro"],
     )
-    axs[1][0].plot([0, 1], [0, 1], color="black", lw=2, linestyle="--", label="Random")
-    axs[1][0].legend(loc="lower right", fontsize="x-small")
+    axs[1][1].plot([0, 1], [0, 1], color="black", lw=2, linestyle="--", label="Random")
+    axs[1][1].legend(loc="lower right", fontsize="x-small")
 
-    axs[1][0].set_xlim([0, 1.0])
-    axs[1][0].set_ylim([0, 1.0])
+    axs[1][1].set_xlim([0, 1.0])
+    axs[1][1].set_ylim([0, 1.0])
 
-    axs[1][0].set_xlabel("False Positive Rate")
-    axs[1][0].set_ylabel("True Positive Rate")
-    axs[1][0].set_title("ROC Curve")
+    axs[1][1].set_xlabel("False Positive Rate")
+    axs[1][1].set_ylabel("True Positive Rate")
+    axs[1][1].set_title("ROC Curve")
 
     ### F1 histogram
     f1s = []
@@ -952,11 +959,11 @@ def quantEval(
     print("min F1 score", min(f1s))
     print("max F1 score", max(f1s))
 
-    axs[1][1].hist(f1s)
-    axs[1][1].set_xlabel("F1 score")
-    axs[1][1].set_ylabel("Count")
-    axs[1][1].set_xlim(right=1)
-    axs[1][1].set_title("Distribution of F1 Scores")
+    axs[1][0].hist(f1s, color =blue)
+    axs[1][0].set_xlabel("F1 score")
+    axs[1][0].set_ylabel("Count")
+    axs[1][0].set_xlim(right=1)
+    axs[1][0].set_title("Distribution of F1 Scores")
 
     plt.tight_layout()
 
@@ -1317,10 +1324,13 @@ def plot_hamming_novelty(minh_test, minh_gen):
     Returns:
             matplotlib.Figure
     """
+    blue = "#7094db"
+    red = "#990000"    
+    
     fig, ax = plt.subplots(figsize=(7.6, 2.25))
     bins = np.linspace(0, 1, 100)
-    ax.hist(minh_test, bins, alpha=0.5, label="Real", color="g")
-    ax.hist(minh_gen, bins, alpha=0.5, label="Generated", color="b")
+    ax.hist(minh_test, bins, alpha=0.7, label="Real", color=blue)
+    ax.hist(minh_gen, bins, alpha=0.7, label="Generated", color=red)
     ax.set_yscale("log")
     ax.set_xlabel("Hamming Distance")
     ax.set_ylabel("Frequency")
@@ -1344,6 +1354,9 @@ def pca_gen_vs_real(generated, test_data, idx=None):
     Returns:
             matplotlib.Figure
     """
+    blue = "#7094db"
+    red = "#990000"    
+    
     n_gen = generated.shape[0]
 
     # concatenate real and generated genome vectors
@@ -1393,7 +1406,7 @@ def pca_gen_vs_real(generated, test_data, idx=None):
     )
     ax.grid()
     targets = ["Real", "Generated"]  # , 'train']
-    colors = ["g", "b"]
+    colors = [blue, red]
     for target, color in zip(targets, colors):
         indicesToKeep = labels_df == target
         # print(finalDf.loc[indicesToKeep, 'principal component 1'])
@@ -1408,8 +1421,9 @@ def pca_gen_vs_real(generated, test_data, idx=None):
         ax.scatter(
             finalDf.loc[[idx], "principal component 1"],
             finalDf.loc[[idx], "principal component 2"],
-            c="r",
-            s=10,
+            c="black",
+            s=35,
+            marker="*"
         )
     ax.legend(targets, loc="lower right")
 
@@ -1463,7 +1477,7 @@ def write_out_for_phylip(OUT_DIR, df, tnum_to_tla, test_tax_dict):
 
     phylum_dict = {}
     with open(save_to, "w") as handle:
-        handle.write("	 " + str(df.shape[0]) + "	 " + str(df.shape[1]) + "\n")
+        handle.write("     " + str(df.shape[0]) + "     " + str(df.shape[1]) + "\n")
 
         for idx, row in enumerate(df.iterrows()):
             index = str(idx)
@@ -1493,7 +1507,7 @@ def write_out_for_phylip(OUT_DIR, df, tnum_to_tla, test_tax_dict):
             phylum_dict[new_id] = phylum
 
             chars = df.iloc[idx].tolist()
-            handle.write(new_id + "	 " + "".join([str(int(i)) for i in chars]) + "\n")
+            handle.write(new_id + "     " + "".join([str(int(i)) for i in chars]) + "\n")
 
     return phylum_dict
 
@@ -1690,6 +1704,9 @@ def bio_insights_fig(test_phyla, subprocess_to_mod, all_kos, ko_f1s, mod_to_kos_
     Returns:
             matplotlib.Figure
     """
+    blue = "#7094db"
+    red = "#990000"
+
     # Get data to plot for phylum analysis
     mad = []
     median = []
@@ -1732,7 +1749,7 @@ def bio_insights_fig(test_phyla, subprocess_to_mod, all_kos, ko_f1s, mod_to_kos_
     fig, [ax1, ax2] = plt.subplots(1, 2, sharey=False, figsize=(15, 10))
     plt.rcParams.update({"font.size": 12})
 
-    ax1.barh(phylum_list, median, xerr=mad)
+    ax1.barh(phylum_list, median, xerr=mad, color=blue)
     ax1.set_xlabel("Median F1 score")
     ax1.set_xlim(0, 1)
     ax1.set_ylim(-0.4, len(phylum_list) - 0.6)
@@ -1740,7 +1757,8 @@ def bio_insights_fig(test_phyla, subprocess_to_mod, all_kos, ko_f1s, mod_to_kos_
     for i, proc in enumerate(list_procs):
         # add scatter on x-axis
         y = np.random.normal(i + 1, 0.04, size=len(list_f1s[i]))
-        ax2.plot(list_f1s[i], y, "r.", alpha=0.2)
+        ax2.scatter(list_f1s[i], y, s=10, color=red, alpha=0.5)
+        #ax2.plot(list_f1s[i], y, marker=".", color=red, alpha=0.5)
 
     bp = ax2.boxplot(list_f1s, showfliers=False, vert=False)
     ax2.set_yticks([i + 1 for i in range(len(list_procs))])
@@ -1892,10 +1910,10 @@ def arch_root(all_kos):
     for s in file:
         if "<a href=" in s:
             x = s.split()[2]
-            # 			 if "K00668" in s:
-            # 				 print("s",s)
-            # 				 print("x", x)
-            # 				 print()
+            #              if "K00668" in s:
+            #                  print("s",s)
+            #                  print("x", x)
+            #                  print()
             if re.match(r"[K]\d{5}", x):
                 barc_kos.append(x)  # [K]\d{5}
 
@@ -2123,14 +2141,14 @@ def make_pred(new_preds, model, corrupted, binarizer_threshold, name):
             pred (tensor) -- for each genome in corrupted, y_probas prediction as to which genes should be on/off
             binary_pred (tensor) -- for each genome in corrupted, binary predications as to which genes should be on/off
     """
-    if new_preds and load_model:
+    if new_preds:
         model.eval()
         with torch.no_grad():
             pred = model.forward(corrupted)[0].detach()
         binary_pred = eval_binarize(pred, binarizer_threshold)
-        torch.save(pred, name + "_preds.pt")
-        torch.save(binary_pred, name + "_binary_preds.pt")
-        print("Saved as " + name + "_preds.pt and " + name + "_binary_preds.pt")
+#        torch.save(pred, name + "_preds.pt")
+#        torch.save(binary_pred, name + "_binary_preds.pt")
+#        print("Saved as " + name + "_preds.pt and " + name + "_binary_preds.pt")
     else:
         pred = torch.load(name + "_preds.pt")
         binary_pred = torch.load(name + "_binary_preds.pt")
@@ -2407,7 +2425,7 @@ def geneCount_vs_geneF1(corrupted_train, num_features, ko_f1s, ax=None):
     ax.set_ylabel("per gene test F1 score")
     plt.sca(ax)
     plt.xticks(rotation=-70)
-    # 	ax.set_xticks(ax.get_xticks(), rotation=-70)
+    #     ax.set_xticks(ax.get_xticks(), rotation=-70)
     print("max KO count:", int(max(ko_counts)))
     print("total number of training genomes:", tr_uncorrupted.shape[0])
     # aysmptotic line
@@ -2570,6 +2588,9 @@ def dist_genes_mods(generated, all_kos, mod_to_ko_clean, test_data):
     Returns:
             matplotlib.Figure
     """
+    blue = "#7094db"
+    red = "#990000"
+    
     # First crunch some data
     gen_mods = complete_mods(generated, all_kos, mod_to_ko_clean)
     real_mods = complete_mods(test_data, all_kos, mod_to_ko_clean)
@@ -2594,23 +2615,24 @@ def dist_genes_mods(generated, all_kos, mod_to_ko_clean, test_data):
     # plt.yticks(fontsize=20)
 
     # Plot number of genes per genome
-    ax1.hist(len_real, 50, color="g", alpha=0.5)
-    ax1.hist(len_gen, 50, color="b", alpha=0.5)
+    ax1.hist(len_real, 50, color=blue, alpha=0.7)
+    ax1.hist(len_gen, 50, color=red, alpha=0.7)
     # ax1.legend(['Real', 'Generated'])
     ax1.set_xlabel("Number of genes")
     ax1.set_ylabel("Genome count")
+    ax1.legend(["Original", "Generated"])
+
 
     # Plot number of complete mods per genome
-    ax2.hist(real_mod_lens, 50, color="g", alpha=0.5)
-    ax2.hist(gen_mod_lens, 50, color="b", alpha=0.5)
+    ax2.hist(real_mod_lens, 50, color=blue, alpha=0.7)
+    ax2.hist(gen_mod_lens, 50, color=red, alpha=0.7)
     # ax2.legend(['Real', 'Generated'])
     ax2.set_xlabel("Number of complete modules")
     ax2.set_ylabel("Genome count")
 
     # Plot the fraction of genomes encoding each mod
-    ax3.bar(labels, real_mod_freq, color="g", alpha=0.5)
-    ax3.bar(labels, gen_mod_freq, color="b", alpha=0.5)
-    ax3.legend(["Real", "Generated"])
+    ax3.bar(labels, gen_mod_freq, color=red, alpha=0.7)
+    ax3.bar(labels, real_mod_freq, color=blue, alpha=1)
     ax3.set_xlabel("Module")
     ax3.set_ylabel("Fraction of genomes \n encoding module")
     ax3.set_xlim(0, len(labels))
@@ -2677,24 +2699,3 @@ def auroc(y_true, y_pred):
     return roc_auc_score(y_true.numpy().ravel(), y_pred.numpy().ravel())
 
 
-# 	fpr = dict()
-# 	tpr = dict()
-# 	roc_auc = dict()
-#
-# 	n_genomes = target.shape[0]
-# 	n_genes = target.shape[1]
-#
-#
-# 	# Calculate scores for each individual gene
-# 	# Note: some genes may have been present in the training set and not in the test set, so in some cases there will be no positive samples in y_true
-# 	warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
-#
-# 	for i in range(n_genes):
-# 		fpr[i], tpr[i], thresh = roc_curve(target[:, i], y_probas[:, i])
-#
-# 		if np.isnan(fpr[i]).any():
-# 			continue
-#
-# 	# Calculate micro-average
-# 	fpr_micro, tpr_micro, _ = roc_curve(target.ravel(), y_probas.ravel())
-# 	roc_auc["micro"] = auc(fpr_micro, tpr_micro)

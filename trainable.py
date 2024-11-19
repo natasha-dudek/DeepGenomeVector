@@ -103,17 +103,35 @@ def cv_dataloader(batch_size, num_features, k):
     # load train data from memory (saves time and, more importantly, space)
     X = data.X  # corrupted genomes
     y = data.y  # uncorrupted genomes
-
-    # Create random split for 1-time k-fold validation
-    idx_genomes = [i for i in range(len(X))]
-    num_cv = int(len(idx_genomes) / k)
-    num_train = len(idx_genomes) - num_cv
-    cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
-    train_idx = list(set(idx_genomes) - set(cv_idx))
+    
+    # THIS IS HACKY
+    # when the data was generated, we did 100 corruptions for each genome,
+    # so we know a new genome starts every 100 lines. TODO: pass through
+    # genome ID or split earlier
+    
+    idx_genome_start = [i for i in range(0, len(X), 100)]
+    num_cv = len(idx_genome_start) // k
+    cv_idx_start = np.random.choice(idx_genome_start, num_cv, replace=False)
+    train_idx_start = list(set(idx_genome_start) - set(cv_idx_start))
+    cv_idx = [i+j for i in cv_idx_start for j in range(100)]
+    train_idx = [i+j for i in train_idx_start for j in range(100)]
     X_train = X[train_idx]
     y_train = y[train_idx]
     X_cv = X[cv_idx]
     y_cv = y[cv_idx]
+
+    
+#
+#    # Create random split for 1-time k-fold validation
+#    idx_genomes = [i for i in range(len(X))]
+#    num_cv = int(len(idx_genomes) / k)
+#    num_train = len(idx_genomes) - num_cv
+#    cv_idx = np.random.choice(idx_genomes, num_cv, replace=False)
+#    train_idx = list(set(idx_genomes) - set(cv_idx))
+#    X_train = X[train_idx]
+#    y_train = y[train_idx]
+#    X_cv = X[cv_idx]
+#    y_cv = y[cv_idx]
 
     # Create dataloaders
     batch_size_cv = 1000
